@@ -1,4 +1,9 @@
-import { ClassifiedRestaurant, DietaryRestriction, PlaceRaw } from "../types";
+import {
+  ClassifiedRestaurant,
+  DietaryRestriction,
+  PlaceRaw,
+  PriceLevel,
+} from "../types";
 
 interface TaxonomyRule {
   category: string;
@@ -102,6 +107,7 @@ export class ClassifierService {
     const cuisines = this.detectCategories(combinedText, CUISINE_RULES);
     const themes = this.detectCategories(combinedText, THEME_RULES);
     const dietarySuitability = this.detectDietarySuitability(place, combinedText);
+    const priceLevel = this.detectPriceLevel(place, combinedText);
 
     return {
       id: place.externalId,
@@ -112,6 +118,7 @@ export class ClassifierService {
       cuisines: cuisines.length > 0 ? cuisines : ["Variada"],
       themes: themes.length > 0 ? themes : ["Casual"],
       dietarySuitability,
+      priceLevel,
       rating: place.rating,
     };
   }
@@ -218,4 +225,72 @@ export class ClassifierService {
 
     return Array.from(results);
   }
+
+  private detectPriceLevel(place: PlaceRaw, combinedText: string): PriceLevel {
+    if (place.priceLevel && [1, 2, 3].includes(place.priceLevel)) {
+      return place.priceLevel;
+    }
+
+    const tags = place.tags ?? {};
+
+    // Explicit OSM tag checks
+    if (tags["charge"] === "expensive" || tags["fee"] === "expensive") {
+      return 3;
+    }
+
+    // High-end / Gourmet keywords -> Level 3
+    const premiumKeywords = [
+      "fine_dining",
+      "gourmet",
+      "de_autor",
+      "de autor",
+      "omakase",
+      "michelin",
+      "degustacion",
+      "degustación",
+      "autor",
+      "palacio",
+      "vinoteca",
+    ];
+
+    for (const kw of premiumKeywords) {
+      const pattern = new RegExp(`(^|[^a-záéíóúñ])${kw}([^a-záéíóúñ]|$)`, "i");
+      if (pattern.test(combinedText)) {
+        return 3;
+      }
+    }
+
+    // Budget / Fast Food / Street Food keywords -> Level 1
+    const budgetKeywords = [
+      "fast_food",
+      "burger",
+      "hamburguesa",
+      "hamburguesas",
+      "empanadas",
+      "rotiseria",
+      "rotisería",
+      "al paso",
+      "panaderia",
+      "panadería",
+      "street_food",
+      "sandwich",
+      "sandwiches",
+      "kiosko",
+      "choripan",
+    ];
+
+    if (tags["amenity"] === "fast_food") {
+      return 1;
+    }
+
+    for (const kw of budgetKeywords) {
+      const pattern = new RegExp(`(^|[^a-záéíóúñ])${kw}([^a-záéíóúñ]|$)`, "i");
+      if (pattern.test(combinedText)) {
+        return 1;
+      }
+    }
+
+    return 2;
+  }
 }
+

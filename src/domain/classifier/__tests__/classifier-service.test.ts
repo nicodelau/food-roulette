@@ -92,5 +92,49 @@ describe("ClassifierService - TDD", () => {
     expect(classified.cuisines).toContain("Variada");
     expect(classified.themes).toContain("Casual");
     expect(classified.dietarySuitability).toEqual([]);
+    expect(classified.priceLevel).toBe(2);
+  });
+
+  it("should infer priceLevel 1 for economic / fast food / street food places", () => {
+    const rawPlace: PlaceRaw = {
+      externalId: "test-eco",
+      name: "Burgers & Empanadas Al Paso",
+      location: { lat: -34.59, lng: -58.43 },
+      tags: {
+        amenity: "fast_food",
+        cuisine: "burger",
+      },
+    };
+
+    const classified = classifier.classify(rawPlace);
+    expect(classified.priceLevel).toBe(1);
+  });
+
+  it("should infer priceLevel 3 for gourmet / fine dining / omakase places", () => {
+    const rawPlace: PlaceRaw = {
+      externalId: "test-gourmet",
+      name: "Aramburu Restaurante de Autor",
+      location: { lat: -34.61, lng: -58.38 },
+      tags: {
+        amenity: "restaurant",
+        cuisine: "fine_dining",
+      },
+    };
+
+    const classified = classifier.classify(rawPlace);
+    expect(classified.priceLevel).toBe(3);
+  });
+
+  it("should preserve explicit priceLevel if provided on PlaceRaw", () => {
+    const rawPlace: PlaceRaw = {
+      externalId: "test-explicit",
+      name: "Bodegón Don Carlos",
+      location: { lat: -34.61, lng: -58.38 },
+      priceLevel: 1,
+    };
+
+    const classified = classifier.classify(rawPlace);
+    expect(classified.priceLevel).toBe(1);
   });
 });
+

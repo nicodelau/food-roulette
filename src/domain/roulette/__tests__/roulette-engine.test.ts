@@ -16,6 +16,7 @@ describe("RouletteEngine - TDD", () => {
       cuisines: ["Italiana", "Argentina"],
       themes: ["Pizzería"],
       dietarySuitability: ["VEGETARIAN"],
+      priceLevel: 1,
       rating: 4.8,
     },
     {
@@ -27,6 +28,7 @@ describe("RouletteEngine - TDD", () => {
       cuisines: ["Italiana"],
       themes: ["Romántico / De Autor"],
       dietarySuitability: ["CELIAC", "VEGETARIAN"],
+      priceLevel: 3,
       rating: 4.5,
     },
     {
@@ -38,6 +40,7 @@ describe("RouletteEngine - TDD", () => {
       cuisines: ["Argentina"],
       themes: ["Parrilla / Asador", "Bodegón"],
       dietarySuitability: [],
+      priceLevel: 2,
       rating: 4.2,
     },
     {
@@ -49,6 +52,7 @@ describe("RouletteEngine - TDD", () => {
       cuisines: ["Variada"],
       themes: ["Casual"],
       dietarySuitability: ["CELIAC", "VEGAN"],
+      priceLevel: 1,
       rating: 4.0,
     },
   ];
@@ -123,6 +127,35 @@ describe("RouletteEngine - TDD", () => {
     expect(result.selectedRestaurant.id).toBe("rest-3");
   });
 
+  it("should filter by selectedPriceLevels (e.g. only level 1: Económico)", () => {
+    const result = engine.spin({
+      pool: mockRestaurants,
+      userLocation: { lat: -34.604, lng: -58.386 },
+      radiusKm: 2.0,
+      selectedPriceLevels: [1],
+    });
+
+    // In 2km: rest-1 (level 1), rest-2 (level 3), rest-3 (level 2). Only rest-1 matches.
+    expect(result.totalEligibleCandidates).toBe(1);
+    expect(result.selectedRestaurant.id).toBe("rest-1");
+  });
+
+  it("should filter by multiple selectedPriceLevels (e.g. [2, 3])", () => {
+    const result = engine.spin({
+      pool: mockRestaurants,
+      userLocation: { lat: -34.604, lng: -58.386 },
+      radiusKm: 2.0,
+      selectedPriceLevels: [2, 3],
+    });
+
+    // In 2km: rest-2 (level 3) and rest-3 (level 2) match.
+    expect(result.totalEligibleCandidates).toBe(2);
+    const candidateIds = result.eligibleCandidates.map((r) => r.id);
+    expect(candidateIds).toContain("rest-2");
+    expect(candidateIds).toContain("rest-3");
+    expect(candidateIds).not.toContain("rest-1");
+  });
+
   it("should throw NoEligibleRestaurantsError when all candidates are filtered out", () => {
     expect(() =>
       engine.spin({
@@ -136,3 +169,4 @@ describe("RouletteEngine - TDD", () => {
     ).toThrow(NoEligibleRestaurantsError);
   });
 });
+

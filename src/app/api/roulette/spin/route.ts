@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
       radiusKm: body.radiusKm ?? 3.0,
       selectedCuisines: body.selectedCuisines,
       selectedThemes: body.selectedThemes,
+      selectedPriceLevels: body.selectedPriceLevels,
       requiredDietary: body.requiredDietary,
       excludeVisited: body.excludeVisited,
       visitedIds: body.visitedIds,

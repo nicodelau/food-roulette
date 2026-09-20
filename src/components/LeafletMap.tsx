@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
-import { ClassifiedRestaurant, Coordinates } from "@/domain/types";
+import { ClassifiedRestaurant, Coordinates, PRICE_TIERS } from "@/domain/types";
 
 interface LeafletMapProps {
   center: Coordinates;
@@ -9,6 +9,7 @@ interface LeafletMapProps {
   selectedRestaurant: ClassifiedRestaurant | null;
   onSelectRestaurant?: (restaurant: ClassifiedRestaurant) => void;
   onMapClick?: (coords: Coordinates) => void;
+  isDark?: boolean;
 }
 
 export const LeafletMap: React.FC<LeafletMapProps> = ({
@@ -17,19 +18,35 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
   selectedRestaurant,
   onSelectRestaurant,
   onMapClick,
+  isDark = true,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
+  const tileLayerRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
 
   // Update center when props change
   useEffect(() => {
     if (mapInstanceRef.current) {
-      mapInstanceRef.current.setView([center.lat, center.lng], mapInstanceRef.current.getZoom(), {
-        animate: true,
-      });
+      mapInstanceRef.current.setView(
+        [center.lat, center.lng],
+        mapInstanceRef.current.getZoom(),
+        {
+          animate: true,
+        },
+      );
     }
   }, [center]);
+
+  // Update tile layer when theme changes
+  useEffect(() => {
+    if (tileLayerRef.current) {
+      const tileUrl = isDark
+        ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=cb1_3rjk_1_7a7e649a99e1a6f596a18604"
+        : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=cb1_3rjk_1_7a7e649a99e1a6f596a18604";
+      tileLayerRef.current.setUrl(tileUrl);
+    }
+  }, [isDark]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !mapContainerRef.current) return;
@@ -46,15 +63,18 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
           zoomControl: false,
         });
 
-        L.tileLayer(
-          "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-          {
-            attribution:
-              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-            subdomains: "abcd",
-            maxZoom: 19,
-          }
-        ).addTo(map);
+        const tileUrl = isDark
+          ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png?key=cb1_3rjk_1_7a7e649a99e1a6f596a18604"
+          : "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=cb1_3rjk_1_7a7e649a99e1a6f596a18604";
+
+        const tileLayer = L.tileLayer(tileUrl, {
+          attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          subdomains: "abcd",
+          maxZoom: 19,
+        }).addTo(map);
+
+        tileLayerRef.current = tileLayer;
 
         L.control.zoom({ position: "bottomright" }).addTo(map);
 
@@ -94,7 +114,9 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
       });
       const userMarker = L.marker([center.lat, center.lng], { icon: userIcon })
         .addTo(map)
-        .bindPopup("<b>📍 Centro de búsqueda</b><br/><small>Haz clic en cualquier punto para mover el centro</small>");
+        .bindPopup(
+          "<b>📍 Centro de búsqueda</b><br/><small>Haz clic en cualquier punto para mover el centro</small>",
+        );
       markersRef.current.push(userMarker);
 
       // 2. Candidate Restaurant markers
@@ -131,10 +153,13 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
           iconAnchor: [pinSize / 2, pinSize / 2],
         });
 
+        const priceTier = PRICE_TIERS[r.priceLevel];
+        const priceBadge = priceTier ? ` <span style="color:#d97706;font-weight:bold;">${priceTier.symbol}</span>` : "";
+
         const marker = L.marker([r.location.lat, r.location.lng], { icon })
           .addTo(map)
           .bindPopup(
-            `<b>${r.name}</b><br/>${r.cuisines.join(", ")}<br/><small>${r.address}</small>`
+            `<b>${r.name}</b>${priceBadge}<br/>${r.cuisines.join(", ")}<br/><small>${r.address}</small>`,
           );
 
         if (onSelectRestaurant) {

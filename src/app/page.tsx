@@ -13,6 +13,7 @@ import {
   ClassifiedRestaurant,
   Coordinates,
   DietaryRestriction,
+  PriceLevel,
 } from "@/domain/types";
 import {
   Badge,
@@ -26,8 +27,8 @@ import { Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 const LeafletMap = dynamic(() => import("@/components/LeafletMap"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-full min-h-[360px] w-full items-center justify-center rounded-2xl border border-slate-800 bg-slate-950 text-slate-500 text-xs">
-      <RefreshCw className="mr-2 h-4 w-4 animate-spin text-orange-400" />
+    <div className="flex h-full min-h-[360px] w-full items-center justify-center rounded-2xl border border-stone-200 dark:border-stone-800 bg-stone-100 dark:bg-stone-900 text-stone-500 text-xs">
+      <RefreshCw className="mr-2 h-4 w-4 animate-spin text-orange-600 dark:text-orange-400" />
       Cargando mapa interactivo...
     </div>
   ),
@@ -43,9 +44,10 @@ export default function HomePage() {
   );
   const [zoneName, setZoneName] = useState<string>(PRESET_ZONES[0].name);
 
-  // 2. Filter States (Radio hasta 20km)
+  // 2. Filter States (Radio hasta 20km & Rango de Precios)
   const [radiusKm, setRadiusKm] = useState<number>(2.5);
   const [excludeVisited, setExcludeVisited] = useState<boolean>(true);
+  const [selectedPriceLevels, setSelectedPriceLevels] = useState<PriceLevel[]>([]);
   const [selectedCuisines, setSelectedCuisines] = useState<string[]>([]);
   const [selectedThemes, setSelectedThemes] = useState<string[]>([]);
   const [selectedDietaries, setSelectedDietaries] = useState<
@@ -61,7 +63,8 @@ export default function HomePage() {
   const [selectedWinner, setSelectedWinner] =
     useState<ClassifiedRestaurant | null>(null);
 
-  // 4. Gamification, Profile & Auth State
+  // 4. Gamification, Profile, Theme & Auth State
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [points, setPoints] = useState<number>(0);
   const [level, setLevel] = useState<UserLevel>(
@@ -73,9 +76,21 @@ export default function HomePage() {
   const [isPassportOpen, setIsPassportOpen] = useState<boolean>(false);
   const [notification, setNotification] = useState<string | null>(null);
 
-  // Load profile data and user session from localStorage
+  // Load profile data and theme from localStorage
   useEffect(() => {
     try {
+      const savedTheme = localStorage.getItem("fr_theme");
+      if (savedTheme === "dark" || savedTheme === "light") {
+        setTheme(savedTheme);
+        document.documentElement.classList.toggle("dark", savedTheme === "dark");
+      } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        setTheme("dark");
+        document.documentElement.classList.add("dark");
+      } else {
+        setTheme("light");
+        document.documentElement.classList.remove("dark");
+      }
+
       const savedUser = localStorage.getItem("fr_auth_user");
       const savedPoints = localStorage.getItem("fr_points");
       const savedVisits = localStorage.getItem("fr_visits");
@@ -134,6 +149,24 @@ export default function HomePage() {
     setTimeout(() => setNotification(null), 3000);
   };
 
+  const handleToggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    try {
+      localStorage.setItem("fr_theme", nextTheme);
+    } catch {
+      // Ignore
+    }
+    document.documentElement.classList.toggle("dark", nextTheme === "dark");
+  };
+
+  const handleTogglePriceLevel = (level: PriceLevel) => {
+    setSelectedPriceLevels((prev) =>
+      prev.includes(level) ? prev.filter((l) => l !== level) : [...prev, level]
+    );
+    setSelectedWinner(null);
+  };
+
   // Fetch places from API when location or radius changes
   const fetchPlaces = useCallback(async () => {
     setIsLoadingPlaces(true);
@@ -186,6 +219,13 @@ export default function HomePage() {
         return false;
       }
 
+      // Price level filter
+      if (selectedPriceLevels.length > 0) {
+        if (!selectedPriceLevels.includes(place.priceLevel)) {
+          return false;
+        }
+      }
+
       // Dietary restrictions (must meet all required)
       if (selectedDietaries.length > 0) {
         const matchesAll = selectedDietaries.every((diet) =>
@@ -217,6 +257,7 @@ export default function HomePage() {
     visits,
     blacklist,
     excludeVisited,
+    selectedPriceLevels,
     selectedDietaries,
     selectedCuisines,
     selectedThemes,
@@ -260,6 +301,7 @@ export default function HomePage() {
           radiusKm,
           selectedCuisines,
           selectedThemes,
+          selectedPriceLevels,
           requiredDietary: selectedDietaries,
           excludeVisited,
           visitedIds: visits.map((v) => v.restaurant.id),
@@ -364,8 +406,8 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      {/* Top Navigation with Logo & Google Auth */}
+    <div className="min-h-screen bg-[#fcfbf9] dark:bg-[#141312] text-stone-900 dark:text-stone-100 flex flex-col transition-colors duration-200">
+      {/* Top Navigation with Logo, Theme Toggle & Google Auth */}
       <Navbar
         points={points}
         level={level}
@@ -374,11 +416,13 @@ export default function HomePage() {
         authUser={authUser}
         onLoginSuccess={handleLoginSuccess}
         onLogout={handleLogout}
+        theme={theme}
+        onToggleTheme={handleToggleTheme}
       />
 
       {/* Notification Banner */}
       {notification && (
-        <div className="sticky top-[61px] z-30 flex items-center justify-center gap-2 bg-gradient-to-r from-orange-600 via-amber-600 to-orange-500 py-2.5 px-4 text-xs font-bold text-white shadow-lg animate-in slide-in-from-top duration-300">
+        <div className="sticky top-[61px] z-30 flex items-center justify-center gap-2 bg-orange-600 py-2.5 px-4 text-xs font-bold text-white shadow-md animate-in slide-in-from-top duration-300">
           <Sparkles className="h-4 w-4" />
           <span>{notification}</span>
         </div>
@@ -407,6 +451,8 @@ export default function HomePage() {
                 setSelectedWinner(null);
               }}
               visitedCount={visits.length}
+              selectedPriceLevels={selectedPriceLevels}
+              onTogglePriceLevel={handleTogglePriceLevel}
               selectedCuisines={selectedCuisines}
               onToggleCuisine={(c) => {
                 setSelectedCuisines((prev) =>
@@ -429,6 +475,7 @@ export default function HomePage() {
                 setSelectedWinner(null);
               }}
               onResetFilters={() => {
+                setSelectedPriceLevels([]);
                 setSelectedCuisines([]);
                 setSelectedThemes([]);
                 setSelectedDietaries([]);
@@ -442,8 +489,8 @@ export default function HomePage() {
           <div className="lg:col-span-8 space-y-6">
             {/* Loading / Error States for Places */}
             {isLoadingPlaces && (
-              <div className="flex items-center gap-2 rounded-2xl border border-orange-500/20 bg-orange-950/20 p-3 text-xs text-orange-300">
-                <RefreshCw className="h-4 w-4 animate-spin shrink-0" />
+              <div className="flex items-center gap-2 rounded-xl border border-orange-200 dark:border-orange-900/40 bg-orange-50 dark:bg-orange-950/20 p-3 text-xs text-orange-800 dark:text-orange-300">
+                <RefreshCw className="h-4 w-4 animate-spin shrink-0 text-orange-600 dark:text-orange-400" />
                 <span>
                   Explorando restaurantes en {zoneName} con OpenStreetMap...
                 </span>
@@ -451,14 +498,14 @@ export default function HomePage() {
             )}
 
             {placesError && (
-              <div className="flex items-center gap-2 rounded-2xl border border-rose-500/20 bg-rose-950/20 p-3 text-xs text-rose-300">
-                <AlertCircle className="h-4 w-4 shrink-0" />
+              <div className="flex items-center gap-2 rounded-xl border border-rose-200 dark:border-rose-900/40 bg-rose-50 dark:bg-rose-950/20 p-3 text-xs text-rose-800 dark:text-rose-300">
+                <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
                 <span>{placesError}</span>
               </div>
             )}
 
             {/* Roulette Spinning Area */}
-            <div className="rounded-3xl border border-slate-800 bg-slate-900/50 p-6 shadow-2xl backdrop-blur-sm">
+            <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-white/90 dark:bg-[#181615]/90 p-6 shadow-sm transition-colors">
               <RouletteWheel
                 candidates={eligibleCandidates}
                 onSpin={handleSpinRoulette}
@@ -488,23 +535,24 @@ export default function HomePage() {
               />
             )}
 
-            {/* Interactive OpenStreetMap (Leaflet with click-to-center) */}
+            {/* Interactive OpenStreetMap (Leaflet with click-to-center & theme-synced tiles) */}
             <div className="space-y-2">
               <div className="flex items-center justify-between px-1">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-stone-600 dark:text-stone-400 font-sans">
                   Mapa Interactivo ({eligibleCandidates.length} opciones en zona)
                 </h3>
-                <span className="text-[11px] text-orange-400 font-medium">
+                <span className="text-[11px] text-orange-600 dark:text-orange-400 font-medium">
                   💡 Haz clic en el mapa para mover el centro
                 </span>
               </div>
-              <div className="h-[400px] w-full">
+              <div className="h-[400px] w-full rounded-2xl border border-stone-200 dark:border-stone-800 overflow-hidden shadow-sm">
                 <LeafletMap
                   center={currentLocation}
                   restaurants={eligibleCandidates}
                   selectedRestaurant={selectedWinner}
                   onSelectRestaurant={(r) => setSelectedWinner(r)}
                   onMapClick={handleMapClick}
+                  isDark={theme === "dark"}
                 />
               </div>
             </div>

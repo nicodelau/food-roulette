@@ -8,10 +8,15 @@ import {
   UtensilsCrossed,
   ShieldCheck,
   Building2,
-  MapPin,
   ChevronDown,
+  Banknote,
 } from "lucide-react";
-import { Coordinates, DietaryRestriction } from "@/domain/types";
+import {
+  Coordinates,
+  DietaryRestriction,
+  PriceLevel,
+  PRICE_TIERS,
+} from "@/domain/types";
 import { CABA_COMUNAS, ComunaCaba } from "@/domain/caba/comunas";
 
 export interface ZonePreset {
@@ -64,6 +69,8 @@ interface FilterBarProps {
   excludeVisited: boolean;
   onToggleExcludeVisited: (val: boolean) => void;
   visitedCount: number;
+  selectedPriceLevels: PriceLevel[];
+  onTogglePriceLevel: (level: PriceLevel) => void;
   selectedCuisines: string[];
   onToggleCuisine: (cuisine: string) => void;
   selectedThemes: string[];
@@ -80,6 +87,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   excludeVisited,
   onToggleExcludeVisited,
   visitedCount,
+  selectedPriceLevels,
+  onTogglePriceLevel,
   selectedCuisines,
   onToggleCuisine,
   selectedThemes,
@@ -121,25 +130,26 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   };
 
   const hasActiveFilters =
+    selectedPriceLevels.length > 0 ||
     selectedCuisines.length > 0 ||
     selectedThemes.length > 0 ||
     selectedDietaries.length > 0 ||
     excludeVisited;
 
   return (
-    <div className="rounded-3xl border border-slate-800 bg-slate-900/75 p-4 shadow-xl backdrop-blur-sm sm:p-5 space-y-4">
+    <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-white/95 dark:bg-[#181615]/95 p-4 sm:p-5 shadow-sm space-y-5 transition-colors duration-200">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between border-b border-stone-150 dark:border-stone-800/80 pb-3">
         <div className="flex items-center gap-2">
-          <SlidersHorizontal className="h-4 w-4 text-orange-400" />
-          <h2 className="text-xs font-bold tracking-wide text-white uppercase">
+          <SlidersHorizontal className="h-4 w-4 text-orange-600 dark:text-orange-500" />
+          <h2 className="text-xs font-bold tracking-wider text-stone-900 dark:text-stone-100 uppercase font-sans">
             Filtros & Ubicación
           </h2>
         </div>
         {hasActiveFilters && (
           <button
             onClick={onResetFilters}
-            className="text-xs font-medium text-orange-400 hover:text-orange-300 underline underline-offset-2 transition"
+            className="text-xs font-medium text-orange-600 dark:text-orange-400 hover:underline transition"
           >
             Restablecer
           </button>
@@ -148,14 +158,14 @@ export const FilterBar: React.FC<FilterBarProps> = ({
 
       {/* Selector de Zonas, GPS y Comunas de CABA */}
       <div className="space-y-2">
-        <label className="block text-xs font-semibold text-slate-300">
+        <label className="block text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider">
           Zona o Comuna (CABA):
         </label>
         <div className="flex flex-wrap gap-1.5">
           <button
             onClick={handleUseCurrentLocation}
             disabled={isLocating}
-            className="flex items-center gap-1.5 rounded-lg border border-orange-500/40 bg-orange-950/30 px-2.5 py-1.5 text-xs font-medium text-orange-300 transition hover:bg-orange-900/40 active:scale-95 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg border border-orange-500/40 bg-orange-50 dark:bg-orange-950/30 px-2.5 py-1.5 text-xs font-semibold text-orange-700 dark:text-orange-300 transition hover:bg-orange-100 dark:hover:bg-orange-900/40 active:scale-95 disabled:opacity-50"
           >
             <Navigation className={`h-3 w-3 ${isLocating ? "animate-spin" : ""}`} />
             {isLocating ? "GPS..." : "GPS Actual"}
@@ -165,7 +175,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           <div className="relative">
             <button
               onClick={() => setShowComunas(!showComunas)}
-              className="flex items-center gap-1 rounded-lg border border-amber-500/40 bg-amber-950/20 px-2.5 py-1.5 text-xs font-medium text-amber-300 transition hover:bg-amber-900/30"
+              className="flex items-center gap-1 rounded-lg border border-amber-500/40 bg-amber-50 dark:bg-amber-950/20 px-2.5 py-1.5 text-xs font-semibold text-amber-800 dark:text-amber-300 transition hover:bg-amber-100 dark:hover:bg-amber-900/30"
             >
               <Building2 className="h-3 w-3" />
               <span>
@@ -177,8 +187,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             </button>
 
             {showComunas && (
-              <div className="absolute left-0 top-full mt-1.5 z-30 max-h-60 w-64 overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-1.5 shadow-2xl">
-                <div className="p-1 text-[10px] font-bold uppercase text-slate-400">
+              <div className="absolute left-0 top-full mt-1.5 z-30 max-h-60 w-64 overflow-y-auto rounded-xl border border-stone-200 dark:border-stone-700 bg-white dark:bg-[#1c1a18] p-1.5 shadow-2xl">
+                <div className="p-1.5 text-[10px] font-bold uppercase tracking-wider text-stone-400">
                   15 Comunas de Capital Federal
                 </div>
                 {CABA_COMUNAS.map((c) => (
@@ -188,11 +198,11 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                     className={`flex w-full flex-col rounded-lg px-2.5 py-1.5 text-left text-xs transition ${
                       selectedComunaId === c.id
                         ? "bg-orange-600 text-white font-semibold"
-                        : "text-slate-300 hover:bg-slate-800"
+                        : "text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-stone-800"
                     }`}
                   >
                     <span className="font-bold">{c.numberLabel}</span>
-                    <span className="text-[10px] text-slate-400 line-clamp-1">
+                    <span className="text-[10px] opacity-75 line-clamp-1">
                       {c.barrios.join(", ")}
                     </span>
                   </button>
@@ -208,7 +218,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                 setSelectedComunaId(null);
                 onLocationChange(zone.coords, zone.name);
               }}
-              className="rounded-lg border border-slate-700/70 bg-slate-800/80 px-2.5 py-1.5 text-xs font-medium text-slate-300 transition hover:border-slate-500 hover:bg-slate-700 active:scale-95"
+              className="rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-100/70 dark:bg-stone-800/80 px-2.5 py-1.5 text-xs font-medium text-stone-700 dark:text-stone-300 transition hover:border-stone-400 dark:hover:border-stone-500 hover:bg-stone-200/60 dark:hover:bg-stone-700 active:scale-95"
             >
               {zone.name}
             </button>
@@ -216,11 +226,58 @@ export const FilterBar: React.FC<FilterBarProps> = ({
         </div>
       </div>
 
+      {/* Rango de Precios ($ / $$ / $$$) */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider">
+            <Banknote className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+            <span>Rango de Precios:</span>
+          </div>
+          <span className="text-[11px] text-stone-500 dark:text-stone-400">
+            {selectedPriceLevels.length === 0
+              ? "Todos los rangos"
+              : `${selectedPriceLevels.length} seleccionado(s)`}
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {([1, 2, 3] as PriceLevel[]).map((lvl) => {
+            const tier = PRICE_TIERS[lvl];
+            const isSelected = selectedPriceLevels.includes(lvl);
+            return (
+              <button
+                key={lvl}
+                type="button"
+                onClick={() => onTogglePriceLevel(lvl)}
+                className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-center transition ${
+                  isSelected
+                    ? "border-amber-600 bg-amber-50 dark:bg-amber-950/40 text-amber-950 dark:text-amber-200 shadow-sm"
+                    : "border-stone-200 dark:border-stone-800 bg-stone-50/60 dark:bg-stone-900/40 text-stone-600 dark:text-stone-400 hover:border-stone-300 dark:hover:border-stone-700 hover:bg-stone-100 dark:hover:bg-stone-800/60"
+                }`}
+              >
+                <span className="text-base font-black text-amber-600 dark:text-amber-400 font-mono">
+                  {tier.symbol}
+                </span>
+                <span className="text-xs font-bold mt-0.5 text-stone-800 dark:text-stone-200">
+                  {tier.name}
+                </span>
+                <span className="text-[10px] text-stone-500 dark:text-stone-400 leading-tight mt-1 line-clamp-1">
+                  {tier.costRange}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Radio en Kilómetros (Hasta 20 km) */}
-      <div>
+      <div className="space-y-1.5">
         <div className="flex items-center justify-between text-xs">
-          <span className="font-medium text-slate-300">Radio de búsqueda:</span>
-          <span className="font-bold text-orange-400">{radiusKm.toFixed(1)} km</span>
+          <span className="font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider">
+            Radio de búsqueda:
+          </span>
+          <span className="font-bold text-orange-600 dark:text-orange-400 font-mono">
+            {radiusKm.toFixed(1)} km
+          </span>
         </div>
         <input
           type="range"
@@ -229,38 +286,38 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           step="0.5"
           value={radiusKm}
           onChange={(e) => onRadiusChange(parseFloat(e.target.value))}
-          className="mt-2 h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-slate-700 accent-orange-500"
+          className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-stone-200 dark:bg-stone-700 accent-orange-600"
         />
-        <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+        <div className="flex justify-between text-[10px] text-stone-500 dark:text-stone-400">
           <span>0.5 km (a pie)</span>
           <span>5 km</span>
-          <span>20 km (área metropolitana)</span>
+          <span>20 km (área metro)</span>
         </div>
       </div>
 
       {/* Toggle Excluir Visitados */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-3 flex items-center justify-between">
+      <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/50 p-3 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-500/10 text-rose-400">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
             <EyeOff className="h-4 w-4" />
           </div>
           <div>
-            <div className="text-xs font-medium text-white">
+            <div className="text-xs font-bold text-stone-800 dark:text-stone-200">
               Excluir lugares ya visitados
             </div>
-            <div className="text-[11px] text-slate-400">
-              {visitedCount} lugares registrados en historial
+            <div className="text-[11px] text-stone-500 dark:text-stone-400">
+              {visitedCount} lugares en historial
             </div>
           </div>
         </div>
         <button
           onClick={() => onToggleExcludeVisited(!excludeVisited)}
           className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-            excludeVisited ? "bg-orange-500" : "bg-slate-700"
+            excludeVisited ? "bg-orange-600" : "bg-stone-300 dark:bg-stone-700"
           }`}
         >
           <span
-            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
               excludeVisited ? "translate-x-4" : "translate-x-0"
             }`}
           />
@@ -268,9 +325,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       </div>
 
       {/* Restricciones Dietarias */}
-      <div>
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 mb-2">
-          <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5 text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider">
+          <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
           <span>Restricciones Dietarias:</span>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -282,8 +339,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                 onClick={() => onToggleDietary(diet.id)}
                 className={`rounded-lg px-2.5 py-1 text-xs font-medium transition border ${
                   isSelected
-                    ? "border-emerald-500 bg-emerald-950/40 text-emerald-300 shadow-sm shadow-emerald-500/20"
-                    : "border-slate-800 bg-slate-950/50 text-slate-400 hover:border-slate-700 hover:text-slate-300"
+                    ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 shadow-sm"
+                    : "border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/40 text-stone-600 dark:text-stone-400 hover:border-stone-300 dark:hover:border-stone-700 hover:text-stone-900 dark:hover:text-stone-200"
                 }`}
               >
                 {diet.label}
@@ -294,9 +351,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       </div>
 
       {/* Clasificación por Orígenes / Países */}
-      <div>
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 mb-2">
-          <UtensilsCrossed className="h-3.5 w-3.5 text-amber-400" />
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5 text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider">
+          <UtensilsCrossed className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
           <span>Tipo de Comida / Origen:</span>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -308,8 +365,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                 onClick={() => onToggleCuisine(cuisine)}
                 className={`rounded-lg px-2.5 py-1 text-xs font-medium transition border ${
                   isSelected
-                    ? "border-orange-500 bg-orange-950/40 text-orange-300 shadow-sm shadow-orange-500/20"
-                    : "border-slate-800 bg-slate-950/50 text-slate-400 hover:border-slate-700 hover:text-slate-300"
+                    ? "border-orange-500 bg-orange-50 dark:bg-orange-950/40 text-orange-900 dark:text-orange-200 shadow-sm"
+                    : "border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/40 text-stone-600 dark:text-stone-400 hover:border-stone-300 dark:hover:border-stone-700 hover:text-stone-900 dark:hover:text-stone-200"
                 }`}
               >
                 {cuisine}
@@ -320,9 +377,9 @@ export const FilterBar: React.FC<FilterBarProps> = ({
       </div>
 
       {/* Clasificación Temática */}
-      <div>
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 mb-2">
-          <Building2 className="h-3.5 w-3.5 text-purple-400" />
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5 text-xs font-bold text-stone-700 dark:text-stone-300 uppercase tracking-wider">
+          <Building2 className="h-3.5 w-3.5 text-stone-600 dark:text-stone-400" />
           <span>Temáticas & Vibras:</span>
         </div>
         <div className="flex flex-wrap gap-1.5">
@@ -334,8 +391,8 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                 onClick={() => onToggleTheme(theme)}
                 className={`rounded-lg px-2.5 py-1 text-xs font-medium transition border ${
                   isSelected
-                    ? "border-purple-500 bg-purple-950/40 text-purple-300 shadow-sm shadow-purple-500/20"
-                    : "border-slate-800 bg-slate-950/50 text-slate-400 hover:border-slate-700 hover:text-slate-300"
+                    ? "border-stone-600 bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-stone-100 font-semibold shadow-sm"
+                    : "border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/40 text-stone-600 dark:text-stone-400 hover:border-stone-300 dark:hover:border-stone-700 hover:text-stone-900 dark:hover:text-stone-200"
                 }`}
               >
                 {theme}

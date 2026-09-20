@@ -2,6 +2,7 @@ import {
   ClassifiedRestaurant,
   Coordinates,
   DietaryRestriction,
+  PriceLevel,
   RouletteResult,
 } from "../types";
 import { NoEligibleRestaurantsError } from "./errors";
@@ -12,6 +13,7 @@ export interface SpinParams {
   radiusKm: number;
   selectedCuisines?: string[];
   selectedThemes?: string[];
+  selectedPriceLevels?: PriceLevel[];
   requiredDietary?: DietaryRestriction[];
   excludeVisited?: boolean;
   visitedIds?: string[];
@@ -51,6 +53,7 @@ export class RouletteEngine {
       radiusKm,
       selectedCuisines = [],
       selectedThemes = [],
+      selectedPriceLevels = [],
       requiredDietary = [],
       excludeVisited = false,
       visitedIds = [],
@@ -106,6 +109,13 @@ export class RouletteEngine {
           restaurant.themes.includes(theme)
         );
         if (!matchesTheme) {
+          return false;
+        }
+      }
+
+      // 7. Filtro de rango de precio (si se seleccionó alguno, debe coincidir con el nivel)
+      if (selectedPriceLevels.length > 0) {
+        if (!selectedPriceLevels.includes(restaurant.priceLevel)) {
           return false;
         }
       }
