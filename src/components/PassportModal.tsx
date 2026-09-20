@@ -10,9 +10,11 @@ import {
   Calendar,
   Sparkles,
   Trash2,
+  User as UserIcon,
 } from "lucide-react";
 import { Badge, UserLevel } from "@/domain/gamification/gamification-service";
 import { ClassifiedRestaurant } from "@/domain/types";
+import { AuthUser } from "./GoogleAuthButton";
 
 export interface StoredVisit {
   restaurant: ClassifiedRestaurant;
@@ -30,6 +32,7 @@ interface PassportModalProps {
   blacklist: ClassifiedRestaurant[];
   onRemoveBlacklist: (id: string) => void;
   onClearVisits: () => void;
+  authUser?: AuthUser | null;
 }
 
 export const PassportModal: React.FC<PassportModalProps> = ({
@@ -42,6 +45,7 @@ export const PassportModal: React.FC<PassportModalProps> = ({
   blacklist,
   onRemoveBlacklist,
   onClearVisits,
+  authUser,
 }) => {
   const [activeTab, setActiveTab] = useState<"passport" | "history" | "blacklist">(
     "passport"
@@ -60,17 +64,34 @@ export const PassportModal: React.FC<PassportModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl overflow-hidden">
         {/* Modal Header */}
         <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20">
-              <Compass className="h-5 w-5" />
-            </div>
+          <div className="flex items-center gap-3">
+            {authUser?.picture ? (
+              <img
+                src={authUser.picture}
+                alt={authUser.name}
+                className="h-10 w-10 rounded-full border border-orange-500/50 object-cover"
+              />
+            ) : (
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                <Compass className="h-5 w-5" />
+              </div>
+            )}
             <div>
-              <h2 className="text-base font-bold text-white">Pasaporte Gastronómico</h2>
-              <p className="text-xs text-slate-400">Tus estadísticas, medallas y salidas</p>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <span>Pasaporte Gastronómico</span>
+                {authUser && (
+                  <span className="text-xs font-normal text-slate-400">
+                    de {authUser.name}
+                  </span>
+                )}
+              </h2>
+              <p className="text-xs text-slate-400">
+                {authUser?.email || "Tus estadísticas, medallas y salidas registradas"}
+              </p>
             </div>
           </div>
           <button

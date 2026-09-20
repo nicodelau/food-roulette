@@ -1,176 +1,149 @@
 # Software Design Document (SDD) - Food Roulette
 
 ## 1. Objetivo y Planteamiento del Problema
-- **Problema:** La elección de un lugar para comer suele generar parálisis por indecisión ("fatiga de decisión"), monotonía al repetir siempre los mismos restaurantes, o frustración al no poder excluir fácilmente lugares ya conocidos o filtrar con rigor por restricciones dietarias (celiaquía, vegetarianismo, veganismo). Además, explorar opciones de Google Maps carece de clasificación temática lúdica e interactiva.
-- **Objetivo:** Desarrollar **Food Roulette**, una plataforma web responsive (Mobile-First) que explore restaurantes por coordenadas o zonas geográficas (soportando tanto OpenStreetMap gratuito como Google Places opcional), los clasifique automáticamente por origen culinario y temática, y ofrezca una ruleta aleatoria inteligente con exclusión de visitas previas, filtros dietarios, perfiles de usuario y un sistema de gamificación con puntos y medallas.
+- **Problema:**
+  1. **Selección geográfica rígida:** El usuario no puede definir libremente el centro de búsqueda haciendo clic directamente en el mapa ni elegir de manera estructurada entre las comunas de Capital Federal (CABA).
+  2. **Radio insuficiente:** El límite anterior de 5 km resulta estrecho para traslados en vehículo o zonas más amplias.
+  3. **Superposición visual (Z-Index):** Al abrir el pasaporte gastronómico, los elementos y capas de Leaflet se superponen sobre el modal.
+  4. **Falta de recomendaciones personalizadas:** No existe un módulo que sugiera lugares basados en el perfil y frecuencia de visitas previas del usuario.
+  5. **Autenticación e Identidad:** Las sesiones de usuario son efímeras o solo en localStorage local; se requiere inicio de sesión con Google OAuth para vincular la identidad, foto y persistir los puntos y medallas.
+- **Objetivo:**
+  Evolucionar Food Roulette para incorporar:
+  - Selección de centro de búsqueda por clic en el mapa.
+  - Catálogo completo de las 15 comunas de CABA con sus barrios.
+  - Ampliación del radio de búsqueda hasta 20 km.
+  - Corrección definitiva del contexto de apilamiento (z-index) del modal y mapa.
+  - Integración del logotipo oficial provisto por el usuario.
+  - Motor de recomendaciones personalizadas basado en afinidad de cocinas y restricciones.
+  - Autenticación con Google OAuth utilizando las credenciales provistas (`clientId` y `clientSecret`).
 
 ---
 
 ## 2. Propuesta de Arquitectura y Flujo de Datos
 
-### Arquitectura General
-Arquitectura limpia y modular basada en **Next.js 15 (App Router, TypeScript estricto, Tailwind CSS)** con **PostgreSQL + Prisma ORM**:
-
+### Arquitectura de Componentes (Fase 2)
 ```
-[ Frontend (Next.js / React 19 / Leaflet Map) ]
-                     │
-                     ▼
-[ API Routes / Server Actions ]
-                     │
-     ┌───────────────┼───────────────┬─────────────────┐
-     ▼               ▼               ▼                 ▼
-[PlacesService] [Classifier]  [RouletteEngine]  [GamificationService]
-     │                               │                 │
-     ▼                               ▼                 ▼
-[IPlacesProvider]               [Filtros &      [Puntos, Badges
-(OSM Overpass /                  Exclusiones]    e Historial]
- Google Places / Mock)               │                 │
-                                     ▼                 ▼
-                     [ PostgreSQL Database (Prisma ORM) ]
+[ Frontend: Next.js 15 App Router ]
+  ├── Navbar (Logo oficial, Sesión Google, Puntos y Nivel)
+  ├── FilterBar (Comunas de CABA, Radio hasta 20km, Clic en mapa)
+  ├── LeafletMap (Selector de centro por clic con 'map.on(click)', Z-Index aislado)
+  ├── RecommendationSection ("Recomendados para vos" según historial)
+  ├── RouletteWheel & WinnerCard
+  └── PassportModal (Z-Index [9999], progreso, insignias e historial)
+         │
+         ▼
+[ API Routes & Servidores de Dominio ]
+  ├── /api/auth/[...nextauth] o /api/auth/google (Google OAuth)
+  ├── /api/places (Búsqueda OSM / Mock por coordenadas de comuna o clic)
+  ├── /api/recommendations (Cálculo de afinidad de usuario)
+  ├── /api/roulette/spin
+  └── /api/visits/check-in
 ```
 
-### Proveedor de Mapas Gratuito vs Google Maps
-Para garantizar un funcionamiento **100% gratuito sin depender obligatoriamente de una tarjeta de crédito o costos de Google Cloud**:
-- **`IPlacesProvider`**:
-  1. **`OpenStreetMapProvider` (Por defecto / Gratuito):** Consulta la API pública de **Overpass (OSM)** (`node["amenity"="restaurant"]`) y **Nominatim** para geocodificación de zonas. Totalmente gratuito y de código abierto.
-  2. **`GooglePlacesProvider` (Opcional):** Habilitable mediante variable de entorno `GOOGLE_MAPS_API_KEY` usando la nueva Google Places API.
-  3. **`MockPlacesProvider`:** Implementación en memoria para pruebas automatizadas TDD y desarrollo veloz offline.
-- **Mapas en Frontend:** Renderizado mediante **Leaflet / React-Leaflet** con OpenStreetMap tiles (sin costo de API de mapas).
+### 1. Clic en Mapa para Centro de Búsqueda
+- En `LeafletMap`, se añade un listener `useMapEvents` o `map.on('click', (e) => onMapClick(e.latlng))`.
+- Al hacer clic, se actualiza el marcador del usuario ("📍 Punto seleccionado en el mapa"), se recalcula la distancia y se refrescan los restaurantes candidatos en el nuevo radio.
 
-### Modelos de Datos (Prisma Schema)
-1. **`User` & `Profile`:**
-   - `id`, `email`, `name`, `points` (balance actual), `level`.
-2. **`DietaryRestriction`:**
-   - `CELIAC` (Sin TACC), `VEGAN`, `VEGETARIAN`, `KOSHER`, `HALAL`, `LACTOSE_FREE`.
-3. **`Restaurant` (Caché local de lugares):**
-   - `id`, `externalId`, `provider` (OSM | GOOGLE), `name`, `lat`, `lng`, `address`, `priceLevel`, `rating`.
-   - `cuisines`: Array o relación (ej: Italiana, Japonesa, Argentina, Mexicana, etc.).
-   - `themes`: Array o relación (ej: Bodegón, Romántico, De autor, Bar/Pub, Familiar).
-   - `dietaryFlags`: Array de restricciones cubiertas.
-4. **`UserExclusion` & `Blacklist`:**
-   - Lugares vetados o ignorados voluntariamente por el usuario.
-5. **`VisitHistory`:**
-   - Historial de lugares visitados, fecha, valoración personal y puntos otorgados.
-6. **`PointsTransaction` & `Badge`:**
-   - Registro auditable de puntos obtenidos (ej. +50 por nueva cocina descubierta, +20 por giro y visita confirmada).
+### 2. Catálogo de Comunas de CABA
+- Definición estructurada de las 15 Comunas porteñas con su centroide geográfico y barrios que la componen (ej. Comuna 14: Palermo; Comuna 13: Belgrano, Núñez, Colegiales; Comuna 6: Caballito, etc.).
+- Selector directo tipo dropdown/pills en la barra de filtros.
 
-### Flujo de Datos
-1. **Búsqueda & Extracción:** El usuario ingresa una zona o usa geolocalización. El backend consulta `PlacesService` (revisando primero el caché local para optimizar latencia) y ejecuta `ClassifierService` para etiquetar tipos de comida y temáticas.
-2. **Filtrado & Ruleta:** El usuario activa sus filtros (radio, tipo de comida, restricciones y switch `Excluir lugares ya visitados`).
-3. **Selección:** `RouletteEngine` descarta restaurantes incompatibles o ya registrados en `VisitHistory`/`Blacklist`. Si quedan candidatos, genera la selección aleatoria o lista para la ruleta visual.
-4. **Confirmación & Gamificación:** El usuario acepta el destino. Al confirmar la salida / check-in, `GamificationService` computa los puntos, actualiza el nivel y registra la visita en el historial.
+### 3. Corrección de Z-Index del Modal
+- En `LeafletMap.tsx`: envolver el mapa con estilo de aislamiento `isolation: isolate; z-index: 10;`.
+- En `PassportModal.tsx`: elevar el overlay a `z-[9999]` con `backdrop-blur-md`, garantizando que quede siempre por encima de cualquier tile o control de Leaflet.
+
+### 4. Motor de Recomendaciones Personalizadas (`RecommendationEngine`)
+- **Algoritmo de Afinidad Gastronómica:**
+  1. Calcula la frecuencia de cocinas visitadas por el usuario:
+     `weight(cuisine) = count(visits with cuisine) * 1.5`
+  2. Filtra candidatos para excluir los ya visitados y los incompatibles con restricciones dietarias.
+  3. Puntuación por restaurante:
+     `score = (rating || 3.5) * 10 + sum(weight(cuisine for each match)) - (distanceKm * 2)`
+  4. Ordena descendentemente y entrega el Top 5 de recomendaciones destacadas ("Especialmente para ti").
+
+### 5. Autenticación con Google OAuth
+- Configuración de variables de entorno seguras en `.env.local`:
+  - `NEXT_PUBLIC_GOOGLE_CLIENT_ID`
+  - `GOOGLE_CLIENT_SECRET`
+- Endpoint de verificación / gestión de sesión OAuth.
+- Guardado del perfil en estado y vinculación del email del usuario a su saldo de puntos, medallas y visitas.
 
 ---
 
 ## 3. Cambios en APIs e Interfaces
 
-### Interfaces de Dominio
+### Nuevas Interfaces de Dominio
 ```typescript
-export interface Coordinates {
-  lat: number;
-  lng: number;
-}
-
-export interface PlaceRaw {
-  externalId: string;
+export interface ComunaCaba {
+  id: number;
   name: string;
+  barrios: string[];
   location: Coordinates;
-  address?: string;
-  tags?: Record<string, string>;
-  rating?: number;
 }
 
-export interface ClassifiedRestaurant {
+export interface RecommendationParams {
+  pool: ClassifiedRestaurant[];
+  visitedCuisinesCount: Record<string, number>;
+  visitedRestaurantIds: Set<string>;
+  requiredDietary?: DietaryRestriction[];
+  userLocation: Coordinates;
+  limit?: number;
+}
+
+export interface UserSession {
   id: string;
   name: string;
-  location: Coordinates;
-  address: string;
-  cuisines: string[];
-  themes: string[];
-  dietarySuitability: string[];
-  rating?: number;
-}
-
-export interface RouletteFilterOptions {
-  userLocation: Coordinates;
-  radiusKm: number;
-  selectedCuisines?: string[];
-  selectedThemes?: string[];
-  requiredDietary?: string[];
-  excludeVisited?: boolean;
-  userId?: string;
-}
-
-export interface RouletteResult {
-  selectedRestaurant: ClassifiedRestaurant;
-  totalEligibleCandidates: number;
+  email: string;
+  picture?: string;
 }
 ```
 
-### Endpoints / Server Actions
-- `GET /api/places/nearby`:
-  - Entrada: `lat`, `lng`, `radiusKm`.
-  - Salida: Lista de `ClassifiedRestaurant`.
-- `POST /api/roulette/spin`:
-  - Entrada: `RouletteFilterOptions`.
-  - Salida: `RouletteResult` (restaurante seleccionado + pool de alternativas).
-- `POST /api/visits/check-in`:
-  - Entrada: `{ userId: string, restaurantId: string, notes?: string }`.
-  - Salida: `{ success: boolean, pointsEarned: number, newTotalPoints: number, newBadges: Badge[] }`.
-- `GET /api/user/preferences`:
-  - Salida: Restricciones dietarias del usuario, historial de visitas y lista de exclusión.
-- `PUT /api/user/preferences`:
-  - Entrada: Actualización de restricciones dietarias y blacklist.
+### Endpoints
+- `POST /api/recommendations`:
+  - Entrada: `{ pool, visitedCuisinesCount, visitedRestaurantIds, requiredDietary, userLocation }`
+  - Salida: `{ success: boolean, recommendations: ClassifiedRestaurant[] }`
+- `POST /api/auth/google`:
+  - Entrada: `{ credential: string }` (Google ID Token) o sesión OAuth.
+  - Salida: `{ success: boolean, user: UserSession }`
 
 ---
 
 ## 4. Plan de Pruebas (TDD)
 
 ### A. Casos de Éxito (Happy Paths)
-1. **Proveedores de Lugares:**
-   - `MockPlacesProvider` y `OpenStreetMapProvider` devuelven una lista normalizada de restaurantes dada una coordenada y radio.
-2. **Clasificador Gastronómico:**
-   - Clasifica correctamente un restaurante con tags `cuisine=pizza` o `cuisine=italian` como cocina `Italiana`.
-   - Clasifica atributos temáticos (ej: `amenity=pub`, `brewery=yes` como `Bar/Cervecería`).
-   - Detecta banderas dietarias (`diet:vegan=yes` o `diet:gluten_free=yes`).
-3. **Motor de Ruleta con Exclusiones:**
-   - Dado un pool de 10 restaurantes donde 3 están en `visitedIds` y `excludeVisited = true`, el pool elegible se reduce exactamente a 7.
-   - Dado un pool con restaurantes variados y un filtro dietario `CELIAC`, solo permanecen los que soportan celiaquía.
-   - La ruleta selecciona aleatoriamente un elemento que pertenece estrictamente al pool elegible.
-4. **Sistema de Gamificación:**
-   - Registrar una visita otorga el puntaje base (+20 pts).
-   - Registrar una visita con una cocina que el usuario nunca antes había probado otorga bonificación de primera exploración (+50 pts) y actualiza el pasaporte gastronómico.
+1. **Motor de Recomendaciones (`RecommendationEngine`):**
+   - Un usuario con 3 visitas a comida "Italiana" y 1 a "Argentina" recibe primero restaurantes italianos no visitados.
+   - Si el usuario tiene restricción `CELIAC`, el motor solo recomienda opciones aptas para celíacos.
+   - Si no hay historial previo, devuelve los mejores calificados de la zona sin fallar.
+2. **Catálogo de Comunas de CABA:**
+   - La selección de cualquier comuna (1 a 15) entrega coordenadas válidas dentro del polígono de la Ciudad de Buenos Aires.
+3. **Mapeo y Manejo de Sesión Google:**
+   - Decodificación y verificación de perfil de usuario Google (nombre, email, avatar).
 
 ### B. Casos de Fallo y Errores (Edge Cases)
-1. **Sin Candidatos Disponibles:**
-   - Si tras aplicar exclusiones y filtros dietarios el pool queda vacío, `RouletteEngine` arroja una excepción controlada `NoEligibleRestaurantsError` con sugerencias de relajación de filtros.
-2. **Coordenadas / Radio Fuera de Límites:**
-   - Si `radiusKm <= 0` o coordenadas están fuera de rango (-90 a 90, -180 a 180), el servicio responde con validación defensiva `InvalidCoordinatesError`.
-3. **Tolerancia a Fallos en Proveedor Externo:**
-   - Si la API externa de mapas falla o tiene timeout, el sistema utiliza restaurantes cacheados previamente en base de datos o retorna un error amigable sin crashear.
-4. **Check-in Duplicado:**
-   - Si el usuario intenta registrar un check-in idéntico en un intervalo menor a 2 horas, se rechaza para evitar abuso de puntos (`DuplicateVisitError`).
+1. **Clic en el mapa fuera de límites:** Validación que restringe coordenadas anómalas.
+2. **Pool de recomendaciones vacío:** Retorna lista vacía con mensaje sugerido sin lanzar excepción de sistema.
+3. **Fallo en autenticación Google:** Respuesta clara con código 401/400 ante credenciales inválidas.
 
 ---
 
 ## 5. Plan de Implementación (Paso a Paso)
 
-1. [ ] **Fase 1: Configuración de Entorno & Tooling**
-   - Inicializar proyecto Next.js 15 con TypeScript, Tailwind CSS, Vitest para testing y Prisma con PostgreSQL.
-2. [ ] **Fase 2: Dominio Places Provider (TDD)**
-   - Escribir tests para interfaz `IPlacesProvider`, `MockPlacesProvider` y `OpenStreetMapProvider`.
-   - Implementar el adaptador Overpass / OSM y el parser de restaurantes.
-3. [ ] **Fase 3: Dominio Clasificador Temático & Dietario (TDD)**
-   - Escribir tests unitarios para reglas de clasificación (países, temáticas, restricciones).
-   - Implementar `ClassifierService`.
-4. [ ] **Fase 4: Motor de Ruleta & Filtros de Exclusión (TDD)**
-   - Escribir tests de exclusión por visitas previas, blacklist y restricciones dietarias.
-   - Implementar `RouletteEngine` con cálculo de distancias (Haversine) y selección aleatoria.
-5. [ ] **Fase 5: Gamificación y Puntos (TDD)**
-   - Escribir tests para cálculo de puntos, registro de visitas e insignias.
-   - Implementar `GamificationService`.
-6. [ ] **Fase 6: Esquema Prisma & Base de Datos**
-   - Configurar esquemas Prisma para usuarios, visitas, restaurantes y puntos.
-7. [ ] **Fase 7: API Endpoints & UI Interactiva**
-   - Implementar Server Actions / Endpoints.
-   - Construir interfaz de usuario con Ruleta animada, vista de Mapa interactivo (Leaflet), panel de filtros y perfil de usuario con pasaporte de puntos.
+1. [ ] **TDD Fase 1: Motor de Recomendaciones**
+   - Escribir tests unitarios en `src/domain/recommendations/__tests__/recommendation-engine.test.ts`.
+   - Implementar `RecommendationEngine`.
+2. [ ] **Catálogo de Comunas y Ampliación de Radio**
+   - Crear dataset y utilidades de las 15 comunas de CABA en `src/domain/caba/comunas.ts`.
+   - Modificar `FilterBar.tsx` para extender el slider de radio a 20 km y agregar selector de comunas.
+3. [ ] **Mapa Interactivo con Clic para Seleccionar Centro**
+   - Modificar `LeafletMap.tsx` con listener de clic que emite `onMapClick(lat, lng)`.
+   - Aislar el contexto de apilamiento (`isolation: isolate`) para evitar colisión de capas.
+4. [ ] **Corrección de Z-Index del Modal de Pasaporte**
+   - Actualizar `PassportModal.tsx` con `z-[9999]` y backdrop superior.
+5. [ ] **Integración del Logo Oficial**
+   - Copiar logo a `public/logo.png` y actualizar `Navbar.tsx` y favicon.
+6. [ ] **Autenticación con Google OAuth**
+   - Configurar variables de entorno y componente/botón de inicio de sesión con Google.
+   - Vincular datos de sesión con el perfil y pasaporte gastronómico.
+7. [ ] **Pruebas de Regresión y Build de Producción**
+   - Ejecutar suite completa con Vitest y verificar `npm run build`.

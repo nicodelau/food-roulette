@@ -7,6 +7,8 @@ import { FilterBar, PRESET_ZONES } from "@/components/FilterBar";
 import { RouletteWheel } from "@/components/RouletteWheel";
 import { WinnerCard } from "@/components/WinnerCard";
 import { PassportModal, StoredVisit } from "@/components/PassportModal";
+import { RecommendationsSection } from "@/components/RecommendationsSection";
+import { AuthUser } from "@/components/GoogleAuthButton";
 import {
   ClassifiedRestaurant,
   Coordinates,
@@ -17,13 +19,14 @@ import {
   GamificationService,
   UserLevel,
 } from "@/domain/gamification/gamification-service";
+import { RecommendationEngine } from "@/domain/recommendations/recommendation-engine";
 import { Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 
 // Dynamic import for Leaflet map to prevent SSR issues
 const LeafletMap = dynamic(() => import("@/components/LeafletMap"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-full min-h-[350px] w-full items-center justify-center rounded-2xl border border-slate-800 bg-slate-950 text-slate-500 text-xs">
+    <div className="flex h-full min-h-[360px] w-full items-center justify-center rounded-2xl border border-slate-800 bg-slate-950 text-slate-500 text-xs">
       <RefreshCw className="mr-2 h-4 w-4 animate-spin text-orange-400" />
       Cargando mapa interactivo...
     </div>
@@ -31,6 +34,7 @@ const LeafletMap = dynamic(() => import("@/components/LeafletMap"), {
 });
 
 const gamificationService = new GamificationService();
+const recommendationEngine = new RecommendationEngine();
 
 export default function HomePage() {
   // 1. Location & Zone State
@@ -39,7 +43,7 @@ export default function HomePage() {
   );
   const [zoneName, setZoneName] = useState<string>(PRESET_ZONES[0].name);
 
-  // 2. Filter States
+  // 2. Filter States (Radio hasta 20km)
   const [radiusKm, setRadiusKm] = useState<number>(2.5);
   const [excludeVisited, setExcludeVisited] = useState<boolean>(true);
   const [selectedCuisines, setSelectedCuisines] = useState<string[]>([]);
@@ -57,7 +61,8 @@ export default function HomePage() {
   const [selectedWinner, setSelectedWinner] =
     useState<ClassifiedRestaurant | null>(null);
 
-  // 4. Gamification, Profile & History State
+  // 4. Gamification, Profile & Auth State
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [points, setPoints] = useState<number>(0);
   const [level, setLevel] = useState<UserLevel>(
     gamificationService.calculateLevel(0)
@@ -68,14 +73,16 @@ export default function HomePage() {
   const [isPassportOpen, setIsPassportOpen] = useState<boolean>(false);
   const [notification, setNotification] = useState<string | null>(null);
 
-  // Load profile data from localStorage on mount
+  // Load profile data and user session from localStorage
   useEffect(() => {
     try {
+      const savedUser = localStorage.getItem("fr_auth_user");
       const savedPoints = localStorage.getItem("fr_points");
       const savedVisits = localStorage.getItem("fr_visits");
       const savedBlacklist = localStorage.getItem("fr_blacklist");
       const savedBadges = localStorage.getItem("fr_badges");
 
+      if (savedUser) setAuthUser(JSON.parse(savedUser));
       if (savedPoints) {
         const pts = parseInt(savedPoints, 10) || 0;
         setPoints(pts);
@@ -89,7 +96,6 @@ export default function HomePage() {
     }
   }, []);
 
-  // Save profile updates to localStorage
   const saveUserData = (
     newPts: number,
     newVisits: StoredVisit[],
@@ -104,6 +110,28 @@ export default function HomePage() {
     } catch {
       // Ignore storage errors
     }
+  };
+
+  const handleLoginSuccess = (user: AuthUser) => {
+    setAuthUser(user);
+    try {
+      localStorage.setItem("fr_auth_user", JSON.stringify(user));
+    } catch {
+      // Ignore
+    }
+    setNotification(`¡Bienvenido/a ${user.name}! Tu perfil ha sido sincronizado.`);
+    setTimeout(() => setNotification(null), 5000);
+  };
+
+  const handleLogout = () => {
+    setAuthUser(null);
+    try {
+      localStorage.removeItem("fr_auth_user");
+    } catch {
+      // Ignore
+    }
+    setNotification("Has cerrado sesión.");
+    setTimeout(() => setNotification(null), 3000);
   };
 
   // Fetch places from API when location or radius changes
@@ -131,6 +159,13 @@ export default function HomePage() {
   useEffect(() => {
     fetchPlaces();
   }, [fetchPlaces]);
+
+  // Click on map to select search center
+  const handleMapClick = (coords: Coordinates) => {
+    setCurrentLocation(coords);
+    setZoneName(`Punto en mapa (${coords.lat.toFixed(3)}, ${coords.lng.toFixed(3)})`);
+    setSelectedWinner(null);
+  };
 
   // Filter eligible candidates for the roulette wheel based on active filters
   const eligibleCandidates = useMemo(() => {
@@ -187,6 +222,27 @@ export default function HomePage() {
     selectedThemes,
   ]);
 
+  // Recommendations based on user history and affinity
+  const recommendations = useMemo(() => {
+    const visitedCuisinesCount: Record<string, number> = {};
+    for (const v of visits) {
+      for (const c of v.restaurant.cuisines) {
+        visitedCuisinesCount[c] = (visitedCuisinesCount[c] || 0) + 1;
+      }
+    }
+
+    const visitedIds = new Set(visits.map((v) => v.restaurant.id));
+
+    return recommendationEngine.getRecommendations({
+      pool: allPlaces,
+      visitedCuisinesCount,
+      visitedRestaurantIds: visitedIds,
+      requiredDietary: selectedDietaries,
+      userLocation: currentLocation,
+      limit: 3,
+    });
+  }, [allPlaces, visits, selectedDietaries, currentLocation]);
+
   // Spin Roulette Handler
   const handleSpinRoulette = async () => {
     if (eligibleCandidates.length === 0 || isSpinning) return;
@@ -194,7 +250,6 @@ export default function HomePage() {
     setIsSpinning(true);
     setSelectedWinner(null);
 
-    // Call API spin endpoint for server-side validation & selection
     try {
       const res = await fetch("/api/roulette/spin", {
         method: "POST",
@@ -214,13 +269,11 @@ export default function HomePage() {
 
       const data = await res.json();
 
-      // Keep wheel spinning for animation timing (~3.5s)
       setTimeout(() => {
         setIsSpinning(false);
         if (data.success && data.result.selectedRestaurant) {
           setSelectedWinner(data.result.selectedRestaurant);
         } else {
-          // Fallback to local random selection if API failed
           const fallback =
             eligibleCandidates[
               Math.floor(Math.random() * eligibleCandidates.length)
@@ -272,7 +325,6 @@ export default function HomePage() {
         const updatedVisits = [newVisit, ...visits];
         const updatedBadges = [...badges];
 
-        // Add newly unlocked badges avoiding duplicates
         for (const b of unlockedBadges) {
           if (!updatedBadges.some((existing) => existing.id === b.id)) {
             updatedBadges.push(b);
@@ -313,12 +365,15 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      {/* Top Navigation */}
+      {/* Top Navigation with Logo & Google Auth */}
       <Navbar
         points={points}
         level={level}
         onOpenPassport={() => setIsPassportOpen(true)}
         zoneName={zoneName}
+        authUser={authUser}
+        onLoginSuccess={handleLoginSuccess}
+        onLogout={handleLogout}
       />
 
       {/* Notification Banner */}
@@ -332,7 +387,7 @@ export default function HomePage() {
       {/* Main Content Layout */}
       <main className="mx-auto flex-1 w-full max-w-7xl px-4 py-6 sm:px-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Column: Filters & Controls (4 cols on large screen) */}
+          {/* Left Column: Filters & Controls */}
           <div className="lg:col-span-4 space-y-4">
             <FilterBar
               currentLocation={currentLocation}
@@ -383,11 +438,11 @@ export default function HomePage() {
             />
           </div>
 
-          {/* Center / Right Column: Roulette & Visual Map (8 cols on large screen) */}
+          {/* Center / Right Column: Roulette, Recommendations & Visual Map */}
           <div className="lg:col-span-8 space-y-6">
             {/* Loading / Error States for Places */}
             {isLoadingPlaces && (
-              <div className="flex items-center gap-2 rounded-xl border border-orange-500/20 bg-orange-950/20 p-3 text-xs text-orange-300">
+              <div className="flex items-center gap-2 rounded-2xl border border-orange-500/20 bg-orange-950/20 p-3 text-xs text-orange-300">
                 <RefreshCw className="h-4 w-4 animate-spin shrink-0" />
                 <span>
                   Explorando restaurantes en {zoneName} con OpenStreetMap...
@@ -396,7 +451,7 @@ export default function HomePage() {
             )}
 
             {placesError && (
-              <div className="flex items-center gap-2 rounded-xl border border-rose-500/20 bg-rose-950/20 p-3 text-xs text-rose-300">
+              <div className="flex items-center gap-2 rounded-2xl border border-rose-500/20 bg-rose-950/20 p-3 text-xs text-rose-300">
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 <span>{placesError}</span>
               </div>
@@ -424,22 +479,32 @@ export default function HomePage() {
               />
             )}
 
-            {/* Interactive OpenStreetMap (Leaflet) */}
+            {/* Recommendations Section */}
+            {recommendations.length > 0 && (
+              <RecommendationsSection
+                recommendations={recommendations}
+                userLocation={currentLocation}
+                onSelect={(restaurant) => setSelectedWinner(restaurant)}
+              />
+            )}
+
+            {/* Interactive OpenStreetMap (Leaflet with click-to-center) */}
             <div className="space-y-2">
               <div className="flex items-center justify-between px-1">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
                   Mapa Interactivo ({eligibleCandidates.length} opciones en zona)
                 </h3>
-                <span className="text-[11px] text-slate-500">
-                  Haz clic en un pin para ver detalles
+                <span className="text-[11px] text-orange-400 font-medium">
+                  💡 Haz clic en el mapa para mover el centro
                 </span>
               </div>
-              <div className="h-[380px] w-full">
+              <div className="h-[400px] w-full">
                 <LeafletMap
                   center={currentLocation}
                   restaurants={eligibleCandidates}
                   selectedRestaurant={selectedWinner}
                   onSelectRestaurant={(r) => setSelectedWinner(r)}
+                  onMapClick={handleMapClick}
                 />
               </div>
             </div>
@@ -467,6 +532,7 @@ export default function HomePage() {
             saveUserData(points, [], badges, blacklist);
           }
         }}
+        authUser={authUser}
       />
     </div>
   );
