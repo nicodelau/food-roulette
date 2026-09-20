@@ -30,20 +30,20 @@ export const Navbar: React.FC<NavbarProps> = ({
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2.5 sm:px-6">
         {/* Brand with Official Logo */}
         <div className="flex items-center gap-3">
-          <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-xl border border-orange-500/30 bg-slate-900 p-0.5 shadow-md shadow-orange-500/20">
+          <div className="relative h-12 w-12 shrink-0">
             <Image
               src="/logo.png"
               alt="Food Roulette Logo"
-              width={44}
-              height={44}
-              className="h-full w-full object-contain"
+              width={48}
+              height={48}
+              className="h-full w-full object-contain drop-shadow-md"
               priority
             />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-extrabold tracking-tight text-white sm:text-xl">
-                Food<span className="text-orange-500">Roulette</span>
+              <h1 className="text-lg font-black tracking-tight text-white sm:text-xl">
+                Food<span className="bg-gradient-to-r from-orange-400 via-amber-400 to-lime-400 bg-clip-text text-transparent">Roulette</span>
               </h1>
               <span className="hidden sm:inline-flex rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/20">
                 100% Free OSM

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { Dices, Sparkles, RefreshCw } from "lucide-react";
 import { ClassifiedRestaurant } from "@/domain/types";
 
@@ -21,7 +22,6 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
   const [displayIndex, setDisplayIndex] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Cycling through candidate names rapidly while spinning for arcade feeling
   useEffect(() => {
     if (isSpinning && candidates.length > 0) {
       intervalRef.current = setInterval(() => {
@@ -42,8 +42,7 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
 
   const handleSpinClick = () => {
     if (isSpinning || candidates.length === 0) return;
-    // Add multiple full turns plus random delta
-    const extraDegrees = 1440 + Math.floor(Math.random() * 360);
+    const extraDegrees = 1800 + Math.floor(Math.random() * 360);
     setRotationAngle((prev) => prev + extraDegrees);
     onSpin();
   };
@@ -56,93 +55,121 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
   return (
     <div className="flex flex-col items-center justify-center p-4">
       {/* Visual Wheel Circle Container */}
-      <div className="relative flex h-64 w-64 items-center justify-center sm:h-72 sm:w-72">
-        {/* Outer Glow Ring */}
-        <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-orange-500/20 via-amber-500/20 to-purple-500/20 blur-xl" />
+      <div className="relative flex h-72 w-72 items-center justify-center sm:h-80 sm:w-80">
+        {/* Outer Glow Ring in Logo Gradient Colors */}
+        <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-orange-500/25 via-amber-400/25 to-lime-400/25 blur-2xl" />
 
-        {/* Outer Border with Markers */}
+        {/* Outer Circular Arrow Ring */}
+        <div
+          className="absolute inset-0 rounded-full p-1.5"
+          style={{
+            background:
+              "conic-gradient(from 45deg, #f97316, #f59e0b, #84cc16, #0284c7, #ec4899, #f97316)",
+          }}
+        >
+          <div className="h-full w-full rounded-full bg-slate-950/80 backdrop-blur-sm" />
+        </div>
+
+        {/* Inner Spinning Multi-colored Wheel Sectors (Matching the Logo) */}
         <div
           style={{
             transform: `rotate(${rotationAngle}deg)`,
             transition: isSpinning
               ? "transform 3.5s cubic-bezier(0.12, 0.8, 0.2, 1)"
               : "none",
+            background:
+              "conic-gradient(from 0deg, #f97316 0deg 45deg, #84cc16 45deg 90deg, #0284c7 90deg 135deg, #f59e0b 135deg 180deg, #f43f5e 180deg 225deg, #22c55e 225deg 270deg, #ec4899 270deg 315deg, #a855f7 315deg 360deg)",
           }}
-          className="relative flex h-full w-full items-center justify-center rounded-full border-4 border-slate-700 bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 shadow-2xl"
+          className="relative flex h-[88%] w-[88%] items-center justify-center rounded-full border-4 border-slate-900 shadow-2xl overflow-hidden"
         >
-          {/* Decorative spokes / ticks */}
+          {/* Subtle Sector Dividers */}
           {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
             <div
               key={deg}
               style={{ transform: `rotate(${deg}deg)` }}
-              className="absolute h-full w-0.5 bg-gradient-to-b from-orange-500/40 via-transparent to-orange-500/40"
+              className="absolute h-full w-0.5 bg-slate-950/50"
             />
           ))}
 
-          {/* Dots on edge */}
-          {[0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].map(
-            (deg) => (
-              <div
-                key={`dot-${deg}`}
-                style={{
-                  transform: `rotate(${deg}deg) translateY(-118px)`,
-                }}
-                className="absolute h-2 w-2 rounded-full bg-amber-400/80 shadow-sm shadow-amber-400"
-              />
-            )
-          )}
+          {/* Icon markers around sectors */}
+          <span className="absolute top-2 text-sm select-none">🍕</span>
+          <span className="absolute right-3 text-sm select-none">🍔</span>
+          <span className="absolute bottom-2 text-sm select-none">🍣</span>
+          <span className="absolute left-3 text-sm select-none">🌮</span>
         </div>
 
         {/* Pointer at the top */}
-        <div className="absolute -top-3 z-20 flex flex-col items-center">
-          <div className="h-0 w-0 border-x-8 border-x-transparent border-t-[16px] border-t-orange-500 drop-shadow-[0_2px_4px_rgba(249,115,22,0.8)]" />
+        <div className="absolute -top-3 z-30 flex flex-col items-center">
+          <div className="h-0 w-0 border-x-8 border-x-transparent border-t-[18px] border-t-orange-500 drop-shadow-[0_4px_6px_rgba(249,115,22,0.9)]" />
         </div>
 
         {/* Center Hub Display */}
-        <div className="absolute z-10 flex h-40 w-40 flex-col items-center justify-center rounded-full border-2 border-orange-500/40 bg-slate-900/95 p-3 text-center shadow-inner backdrop-blur-md">
+        <div className="absolute z-20 flex h-36 w-36 flex-col items-center justify-center rounded-full border-4 border-slate-900 bg-slate-950/95 p-3 text-center shadow-2xl backdrop-blur-md">
           {isSpinning ? (
             <div className="space-y-1">
               <RefreshCw className="mx-auto h-6 w-6 animate-spin text-orange-400" />
-              <p className="text-[11px] font-bold text-orange-400 animate-pulse uppercase tracking-wider">
-                Eligiendo...
+              <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest animate-pulse">
+                Girando...
               </p>
-              <p className="truncate max-w-[120px] text-xs font-semibold text-slate-200">
+              <p className="truncate max-w-[110px] text-xs font-semibold text-slate-100">
                 {currentDisplayPlace?.name ?? "..."}
               </p>
             </div>
           ) : currentDisplayPlace ? (
             <div className="space-y-1">
-              <span className="text-xl">✨</span>
-              <p className="line-clamp-2 text-xs font-bold text-white leading-tight">
+              <div className="relative mx-auto h-7 w-7">
+                <Image
+                  src="/logo.png"
+                  alt="Logo Icon"
+                  width={28}
+                  height={28}
+                  className="object-contain"
+                />
+              </div>
+              <p className="line-clamp-2 text-[11px] font-extrabold text-white leading-tight">
                 {currentDisplayPlace.name}
               </p>
-              <p className="text-[10px] font-medium text-orange-400">
+              <p className="text-[9px] font-bold text-amber-400">
                 {currentDisplayPlace.cuisines[0] || "Gastronomía"}
               </p>
             </div>
           ) : (
             <div className="space-y-1 text-slate-400">
-              <Dices className="mx-auto h-7 w-7 text-slate-500" />
-              <p className="text-xs font-medium">Lista para girar</p>
+              <div className="relative mx-auto h-8 w-8 opacity-80">
+                <Image
+                  src="/logo.png"
+                  alt="Logo Icon"
+                  width={32}
+                  height={32}
+                  className="object-contain"
+                />
+              </div>
+              <p className="text-[11px] font-semibold text-slate-300">
+                ¡Lista para girar!
+              </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Spin CTA Button */}
+      {/* Spin CTA Button Matching Logo Colors */}
       <div className="mt-6 flex flex-col items-center gap-2">
         <button
           onClick={handleSpinClick}
           disabled={isSpinning || candidates.length === 0}
-          className="group relative flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-orange-600 via-amber-600 to-orange-500 px-8 py-4 text-sm font-bold tracking-wide text-white shadow-xl shadow-orange-600/30 transition duration-200 hover:brightness-110 hover:shadow-orange-600/50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+          className="group relative flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-lime-500 px-8 py-4 text-sm font-extrabold tracking-wide text-slate-950 shadow-xl shadow-orange-500/25 transition duration-200 hover:brightness-110 hover:shadow-orange-500/40 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Dices className={`h-5 w-5 ${isSpinning ? "animate-spin" : "group-hover:rotate-12 transition-transform"}`} />
+          <Dices
+            className={`h-5 w-5 text-slate-950 ${
+              isSpinning ? "animate-spin" : "group-hover:rotate-12 transition-transform"
+            }`}
+          />
           <span>
             {isSpinning
               ? "Girando Ruleta..."
               : `¡Girar Ruleta! (${candidates.length} disponibles)`}
           </span>
-          <Sparkles className="h-4 w-4 text-amber-200" />
+          <Sparkles className="h-4 w-4 text-slate-950" />
         </button>
 
         {candidates.length === 0 && !isSpinning && (

@@ -25,19 +25,21 @@ interface OSMProviderOptions {
 
 const DEFAULT_MIRRORS = [
   "https://overpass.kumi.systems/api/interpreter",
-  "https://overpass-api.de/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
+  "https://overpass-api.de/api/interpreter",
 ];
 
 export class OpenStreetMapProvider implements IPlacesProvider {
   private readonly endpoints: string[];
   private readonly fetchClient: typeof fetch;
+  private readonly hasCustomFetchClient: boolean;
 
   constructor(options?: OSMProviderOptions) {
     this.endpoints = options?.endpointUrl
       ? [options.endpointUrl]
       : DEFAULT_MIRRORS;
     this.fetchClient = options?.fetchClient ?? fetch;
+    this.hasCustomFetchClient = !!options?.fetchClient;
   }
 
   async searchNearby(params: SearchNearbyParams): Promise<PlaceRaw[]> {
@@ -55,12 +57,48 @@ export class OpenStreetMapProvider implements IPlacesProvider {
       );
     }
 
-    // Limit radius to a safe maximum of 5km for Overpass server quota to avoid timeout
     const queryRadiusMeters = Math.min(Math.round(radiusKm * 1000), 5000);
-    const query = `[out:json][timeout:15];(node["amenity"~"restaurant|cafe|pub|fast_food"](around:${queryRadiusMeters},${lat},${lng}););out center;`;
+    const query = `[out:json][timeout:20];(node["amenity"~"restaurant|cafe|pub|fast_food"](around:${queryRadiusMeters},${lat},${lng}););out center 80;`;
 
     let lastError: Error | null = null;
 
+    // 1. Try curl bridge on Node.js runtime if not a custom test mock client
+    if (!this.hasCustomFetchClient && typeof window === "undefined") {
+      try {
+        const { execFile } = await import("child_process");
+        const { promisify } = await import("util");
+        const execFileAsync = promisify(execFile);
+
+        for (const endpoint of this.endpoints) {
+          try {
+            const { stdout } = await execFileAsync("curl", [
+              "-s",
+              "-4",
+              "-X",
+              "POST",
+              "--max-time",
+              "6",
+              "--data-urlencode",
+              `data=${query}`,
+              endpoint,
+            ]);
+
+            if (stdout && stdout.trim().startsWith("{")) {
+              const data: OverpassResponse = JSON.parse(stdout);
+              if (Array.isArray(data.elements) && data.elements.length > 0) {
+                return this.parseElements(data.elements);
+              }
+            }
+          } catch {
+            // Try next mirror
+          }
+        }
+      } catch {
+        // Fallback to fetch
+      }
+    }
+
+    // 2. Fallback to standard fetch
     for (const endpoint of this.endpoints) {
       try {
         const response = await this.fetchClient(endpoint, {
@@ -70,9 +108,10 @@ export class OpenStreetMapProvider implements IPlacesProvider {
             "User-Agent": "FoodRouletteApp/1.0 (https://github.com/nicodelau/food-roulette)",
           },
           body: `data=${encodeURIComponent(query)}`,
-          signal: typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
-            ? AbortSignal.timeout(8000)
-            : undefined,
+          signal:
+            typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+              ? AbortSignal.timeout(6000)
+              : undefined,
         });
 
         if (!response.ok) {
@@ -82,11 +121,20 @@ export class OpenStreetMapProvider implements IPlacesProvider {
           );
         }
 
-        const data: OverpassResponse = await response.json();
+        let data: OverpassResponse;
+        if (typeof response.text === "function") {
+          const rawText = await response.text();
+          if (!rawText.trim().startsWith("{")) {
+            throw new PlacesProviderError(`Overpass returned non-JSON response`);
+          }
+          data = JSON.parse(rawText);
+        } else {
+          data = await response.json();
+        }
+
         return this.parseElements(data.elements);
       } catch (err: unknown) {
         lastError = err instanceof Error ? err : new Error(String(err));
-        // Continue to next mirror if available
       }
     }
 
