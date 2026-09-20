@@ -45,3 +45,21 @@ body {
 .pulse-glow {
   animation: pulseGlow 2s infinite ease-in-out;
 }
+
+/* Leaflet Custom Pin & Popup Styles */
+.leaflet-div-icon.custom-restaurant-pin,
+.leaflet-div-icon.custom-user-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 14px !important;
+  padding: 4px 6px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.15) !important;
+}
+
+.leaflet-popup-tip {
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2) !important;
+}
+

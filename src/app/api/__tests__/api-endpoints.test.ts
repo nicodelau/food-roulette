@@ -26,7 +26,7 @@ describe("API Endpoints Integration - TDD", () => {
       expect(res.status).toBe(200);
       expect(data.success).toBe(true);
       expect(data.places.length).toBeGreaterThan(0);
-    });
+    }, 10000);
   });
 
   describe("POST /api/roulette/spin", () => {

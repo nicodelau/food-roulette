@@ -24,9 +24,9 @@ interface OSMProviderOptions {
 }
 
 const DEFAULT_MIRRORS = [
+  "https://overpass.openstreetmap.fr/api/interpreter",
   "https://overpass.kumi.systems/api/interpreter",
   "https://overpass.private.coffee/api/interpreter",
-  "https://overpass-api.de/api/interpreter",
 ];
 
 export class OpenStreetMapProvider implements IPlacesProvider {
@@ -58,7 +58,7 @@ export class OpenStreetMapProvider implements IPlacesProvider {
     }
 
     const queryRadiusMeters = Math.min(Math.round(radiusKm * 1000), 5000);
-    const query = `[out:json][timeout:20];(node["amenity"~"restaurant|cafe|pub|fast_food"](around:${queryRadiusMeters},${lat},${lng}););out center 80;`;
+    const query = `[out:json][timeout:15];(node["amenity"~"restaurant|cafe|pub|fast_food"]["name"](around:${queryRadiusMeters},${lat},${lng}););out center 60;`;
 
     let lastError: Error | null = null;
 
@@ -77,7 +77,7 @@ export class OpenStreetMapProvider implements IPlacesProvider {
               "-X",
               "POST",
               "--max-time",
-              "6",
+              "4",
               "--data-urlencode",
               `data=${query}`,
               endpoint,
@@ -110,7 +110,7 @@ export class OpenStreetMapProvider implements IPlacesProvider {
           body: `data=${encodeURIComponent(query)}`,
           signal:
             typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
-              ? AbortSignal.timeout(6000)
+              ? AbortSignal.timeout(4000)
               : undefined,
         });
 

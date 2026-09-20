@@ -26,10 +26,10 @@ export async function GET(request: NextRequest) {
       rawPlaces = await mockProvider.searchNearby({ lat, lng, radiusKm });
     } else {
       try {
-        // Fast timeout race (2.5s) to guarantee high responsiveness
+        // Timeout race (4.2s) to allow Overpass to resolve while preventing long stalls
         const fetchPromise = osmProvider.searchNearby({ lat, lng, radiusKm });
         const timeoutPromise = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("OSM query timeout")), 2500)
+          setTimeout(() => reject(new Error("OSM query timeout")), 4200)
         );
 
         rawPlaces = await Promise.race([fetchPromise, timeoutPromise]);

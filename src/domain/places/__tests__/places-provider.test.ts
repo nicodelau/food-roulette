@@ -20,6 +20,23 @@ describe("Places Provider - TDD", () => {
       expect(places[0]).toHaveProperty("name");
       expect(places[0]).toHaveProperty("location");
     });
+
+    it("should never return synthetic or non-existent places with mock-dyn or generic labels", async () => {
+      const provider = new MockPlacesProvider();
+      const places = await provider.searchNearby({
+        lat: -34.6037,
+        lng: -58.3816, // Obelisco / Microcentro
+        radiusKm: 5,
+      });
+
+      expect(places.length).toBeGreaterThan(0);
+      for (const place of places) {
+        expect(place.externalId).not.toContain("mock-dyn");
+        expect(place.address).not.toContain("Zona de búsqueda");
+        expect(place.location.lat).toBeLessThan(0);
+        expect(place.location.lng).toBeLessThan(0);
+      }
+    });
   });
 
   describe("OpenStreetMapProvider (Overpass API)", () => {

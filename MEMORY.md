@@ -11,7 +11,7 @@
   - Testing: Vitest (TDD riguroso).
 
 ## 2. Foco Actual
-- Fase 3: Rediseño visual artesanal/editorial (abandonando estética genérica de IA), soporte de Modo Claro/Oscuro y sistema de Rango de Precios.
+- Calibración geográfica precisa de pines (SVG teardrop con aguja al portal) y eliminación de puntos ficticios en el catálogo.
 
 ## 3. Roadmap Inmediato
 - [x] Actualización de SDD.md con Fase 3.
@@ -20,4 +20,7 @@
 - [x] Implementación de Modo Claro / Oscuro con toggle en Navbar y persistencia (`localStorage`).
 - [x] Rediseño estético global: paleta cálida y refinada, tipografía y tarjetas estilo guía gastronómica (Bistro / Beli).
 - [x] Selector táctil de precios `$ / $$ / $$$` con rangos de costos en `FilterBar`, `WinnerCard` y `LeafletMap`.
-- [x] Pruebas completas (37/37 tests pasando), build de producción y push a GitHub.
+- [x] Calibración de Waypoints: pines SVG tipo aguja (teardrop needle `iconAnchor: [width/2, height]`) anclados a la puerta exacta del local.
+- [x] Eliminación total de datos sintéticos: catálogo de 60 lugares 100% reales en CABA con coordenadas y direcciones físicas verificadas.
+- [x] Optimización de Overpass OpenStreetMap con filtro `["name"]`, timeout dinámico de 4.2s y fallback defensivo con lugares reales.
+- [x] Pruebas completas (38/38 tests pasando), build de producción y push a GitHub.
