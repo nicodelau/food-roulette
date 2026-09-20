@@ -23,13 +23,20 @@ interface OSMProviderOptions {
   fetchClient?: typeof fetch;
 }
 
+const DEFAULT_MIRRORS = [
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+];
+
 export class OpenStreetMapProvider implements IPlacesProvider {
-  private readonly endpointUrl: string;
+  private readonly endpoints: string[];
   private readonly fetchClient: typeof fetch;
 
   constructor(options?: OSMProviderOptions) {
-    this.endpointUrl =
-      options?.endpointUrl ?? "https://overpass-api.de/api/interpreter";
+    this.endpoints = options?.endpointUrl
+      ? [options.endpointUrl]
+      : DEFAULT_MIRRORS;
     this.fetchClient = options?.fetchClient ?? fetch;
   }
 
@@ -48,32 +55,43 @@ export class OpenStreetMapProvider implements IPlacesProvider {
       );
     }
 
-    const radiusMeters = Math.round(radiusKm * 1000);
-    const query = `[out:json][timeout:25];(node["amenity"~"restaurant|cafe|pub|fast_food"](around:${radiusMeters},${lat},${lng}););out center;`;
+    // Limit radius to a safe maximum of 5km for Overpass server quota to avoid timeout
+    const queryRadiusMeters = Math.min(Math.round(radiusKm * 1000), 5000);
+    const query = `[out:json][timeout:15];(node["amenity"~"restaurant|cafe|pub|fast_food"](around:${queryRadiusMeters},${lat},${lng}););out center;`;
 
-    let response: Response;
-    try {
-      response = await this.fetchClient(this.endpointUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: `data=${encodeURIComponent(query)}`,
-      });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Unknown network error";
-      throw new PlacesProviderError(`Failed to fetch from OpenStreetMap Overpass: ${msg}`);
+    let lastError: Error | null = null;
+
+    for (const endpoint of this.endpoints) {
+      try {
+        const response = await this.fetchClient(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "FoodRouletteApp/1.0 (https://github.com/nicodelau/food-roulette)",
+          },
+          body: `data=${encodeURIComponent(query)}`,
+          signal: typeof AbortSignal !== "undefined" && "timeout" in AbortSignal
+            ? AbortSignal.timeout(8000)
+            : undefined,
+        });
+
+        if (!response.ok) {
+          throw new PlacesProviderError(
+            `Overpass API returned HTTP error ${response.status}: ${response.statusText}`,
+            response.status
+          );
+        }
+
+        const data: OverpassResponse = await response.json();
+        return this.parseElements(data.elements);
+      } catch (err: unknown) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        // Continue to next mirror if available
+      }
     }
 
-    if (!response.ok) {
-      throw new PlacesProviderError(
-        `Overpass API returned HTTP error ${response.status}: ${response.statusText}`,
-        response.status
-      );
-    }
-
-    const data: OverpassResponse = await response.json();
-    return this.parseElements(data.elements);
+    const msg = lastError?.message || "All Overpass mirrors failed";
+    throw new PlacesProviderError(`Failed to fetch from OpenStreetMap Overpass: ${msg}`);
   }
 
   private parseElements(elements: OverpassNode[]): PlaceRaw[] {
@@ -81,7 +99,7 @@ export class OpenStreetMapProvider implements IPlacesProvider {
 
     for (const elem of elements) {
       const name = elem.tags?.name;
-      if (!name) continue; // Skip un-named amenities
+      if (!name) continue;
 
       const latitude = elem.lat ?? elem.center?.lat;
       const longitude = elem.lon ?? elem.center?.lon;

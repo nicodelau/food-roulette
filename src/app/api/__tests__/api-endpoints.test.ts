@@ -17,6 +17,16 @@ describe("API Endpoints Integration - TDD", () => {
       expect(data.places[0]).toHaveProperty("cuisines");
       expect(data.places[0]).toHaveProperty("themes");
     });
+
+    it("should return classified places with radiusKm=20 gracefully", async () => {
+      const req = new NextRequest("http://localhost:3000/api/places?lat=-34.5885&lng=-58.4306&radiusKm=20");
+      const res = await getPlaces(req);
+      const data = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.places.length).toBeGreaterThan(0);
+    });
   });
 
   describe("POST /api/roulette/spin", () => {

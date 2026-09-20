@@ -4,6 +4,7 @@ import { InvalidCoordinatesError } from "./errors";
 
 export class MockPlacesProvider implements IPlacesProvider {
   private places: PlaceRaw[] = [
+    // Comuna 1: San Telmo / Montserrat / Centro
     {
       externalId: "mock-1",
       name: "La Brigada Parrilla",
@@ -17,18 +18,79 @@ export class MockPlacesProvider implements IPlacesProvider {
       rating: 4.6,
     },
     {
-      externalId: "mock-2",
-      name: "Sarkis Cocina Armenia",
-      location: { lat: -34.5905, lng: -58.4382 },
-      address: "Thames 1101, Villa Crespo",
+      externalId: "mock-8",
+      name: "El Obrero Bodegón",
+      location: { lat: -34.6341, lng: -58.3615 },
+      address: "Agustín R. Caffarena 64, La Boca",
       tags: {
-        cuisine: "armenian;middle_eastern",
+        cuisine: "argentinian;bodegon",
+        amenity: "restaurant",
+      },
+      rating: 4.5,
+    },
+    {
+      externalId: "mock-9",
+      name: "Pizzería Güerrin",
+      location: { lat: -34.6042, lng: -58.3862 },
+      address: "Av. Corrientes 1368, Centro",
+      tags: {
+        cuisine: "italian;pizza",
         amenity: "restaurant",
         "diet:vegetarian": "yes",
-        "diet:vegan": "yes",
       },
       rating: 4.8,
     },
+    // Comuna 2: Recoleta
+    {
+      externalId: "mock-10",
+      name: "Fervor Brasas",
+      location: { lat: -34.5891, lng: -58.3892 },
+      address: "Posadas 1519, Recoleta",
+      tags: {
+        cuisine: "argentinian;parrilla;steakhouse",
+        amenity: "restaurant",
+      },
+      rating: 4.7,
+    },
+    // Comuna 5: Almagro / Boedo
+    {
+      externalId: "mock-11",
+      name: "Las Violetas Confitería",
+      location: { lat: -34.6184, lng: -58.4214 },
+      address: "Av. Rivadavia 3899, Almagro",
+      tags: {
+        cuisine: "cafe;bakery;pasteleria",
+        amenity: "cafe",
+        "diet:vegetarian": "yes",
+      },
+      rating: 4.6,
+    },
+    // Comuna 6: Caballito
+    {
+      externalId: "mock-12",
+      name: "El Boliche de Darío",
+      location: { lat: -34.6212, lng: -58.4451 },
+      address: "Av. Coronel Díaz y Caballito",
+      tags: {
+        cuisine: "argentinian;parrilla;bodegon",
+        amenity: "restaurant",
+      },
+      rating: 4.4,
+    },
+    // Comuna 13: Belgrano / Colegiales
+    {
+      externalId: "mock-13",
+      name: "Hong Kong Style",
+      location: { lat: -34.5582, lng: -58.4553 },
+      address: "Montañeses 2149, Barrio Chino",
+      tags: {
+        cuisine: "chinese;asian;dim_sum",
+        amenity: "restaurant",
+        "diet:vegan": "yes",
+      },
+      rating: 4.5,
+    },
+    // Comuna 14: Palermo
     {
       externalId: "mock-3",
       name: "Cucina Paradiso Senza Glutine",
@@ -88,16 +150,57 @@ export class MockPlacesProvider implements IPlacesProvider {
       },
       rating: 4.3,
     },
+    // Comuna 15: Villa Crespo / Chacarita
+    {
+      externalId: "mock-2",
+      name: "Sarkis Cocina Armenia",
+      location: { lat: -34.5905, lng: -58.4382 },
+      address: "Thames 1101, Villa Crespo",
+      tags: {
+        cuisine: "armenian;middle_eastern",
+        amenity: "restaurant",
+        "diet:vegetarian": "yes",
+        "diet:vegan": "yes",
+      },
+      rating: 4.8,
+    },
+    {
+      externalId: "mock-14",
+      name: "Donnet Hongos & Plant Based",
+      location: { lat: -34.5861, lng: -58.4472 },
+      address: "Av. Jorge Newbery 4081, Chacarita",
+      tags: {
+        cuisine: "vegan;organic;healthy",
+        amenity: "restaurant",
+        "diet:vegan": "only",
+        "diet:vegetarian": "yes",
+      },
+      rating: 4.6,
+    },
   ];
 
   async searchNearby(params: SearchNearbyParams): Promise<PlaceRaw[]> {
     if (params.lat < -90 || params.lat > 90 || params.lng < -180 || params.lng > 180) {
-      throw new InvalidCoordinatesError(`Coordinates (${params.lat}, ${params.lng}) are out of range`);
+      throw new InvalidCoordinatesError(
+        `Coordinates (${params.lat}, ${params.lng}) are out of range`
+      );
     }
     if (params.radiusKm <= 0) {
-      throw new InvalidCoordinatesError(`Radius must be positive, got ${params.radiusKm}`);
+      throw new InvalidCoordinatesError(
+        `Radius must be positive, got ${params.radiusKm}`
+      );
     }
 
-    return [...this.places];
+    // Return places, sorting closest first
+    const toRad = (d: number) => (d * Math.PI) / 180;
+    const sorted = [...this.places].sort((a, b) => {
+      const distA =
+        Math.hypot(a.location.lat - params.lat, a.location.lng - params.lng);
+      const distB =
+        Math.hypot(b.location.lat - params.lat, b.location.lng - params.lng);
+      return distA - distB;
+    });
+
+    return sorted;
   }
 }

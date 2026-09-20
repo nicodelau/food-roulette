@@ -26,13 +26,20 @@ export async function GET(request: NextRequest) {
       rawPlaces = await mockProvider.searchNearby({ lat, lng, radiusKm });
     } else {
       try {
-        rawPlaces = await osmProvider.searchNearby({ lat, lng, radiusKm });
-        // If Overpass returned 0 results or had transient issue, fallback to mock so app is always functional
+        // Fast timeout race (2.5s) to guarantee high responsiveness
+        const fetchPromise = osmProvider.searchNearby({ lat, lng, radiusKm });
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("OSM query timeout")), 2500)
+        );
+
+        rawPlaces = await Promise.race([fetchPromise, timeoutPromise]);
+
         if (rawPlaces.length === 0) {
           rawPlaces = await mockProvider.searchNearby({ lat, lng, radiusKm });
         }
-      } catch (osmError) {
-        console.warn("OSM Overpass call failed, using mock fallback:", osmError);
+      } catch (osmError: unknown) {
+        const msg = osmError instanceof Error ? osmError.message : String(osmError);
+        console.log(`[Places] OSM Overpass (${msg}), using enriched local catalog fallback.`);
         rawPlaces = await mockProvider.searchNearby({ lat, lng, radiusKm });
       }
     }
