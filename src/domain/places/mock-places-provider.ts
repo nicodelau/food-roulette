@@ -1,9 +1,10 @@
 import { IPlacesProvider, SearchNearbyParams } from "./types";
-import { PlaceRaw } from "../types";
+import { PlaceRaw, PriceLevel } from "../types";
 import { InvalidCoordinatesError } from "./errors";
+import baDataJson from "../../data/ba_data_gastronomia.json";
 
 export class MockPlacesProvider implements IPlacesProvider {
-  private basePlaces: PlaceRaw[] = [
+  private static readonly CURATED_PLACES: PlaceRaw[] = [
     // Palermo Soho & Hollywood (Comuna 14)
     {
       externalId: "mock-1",
@@ -797,8 +798,41 @@ export class MockPlacesProvider implements IPlacesProvider {
     },
   ];
 
-  constructor() {
-    this.ensureZoneIds();
+  private basePlaces: PlaceRaw[];
+
+  constructor(customPlaces?: PlaceRaw[]) {
+    if (customPlaces) {
+      this.basePlaces = customPlaces;
+    } else {
+      this.basePlaces = MockPlacesProvider.CURATED_PLACES.map((p) => ({ ...p }));
+      this.ensureZoneIds();
+      this.loadBaDataPlaces();
+    }
+  }
+
+  private loadBaDataPlaces(): void {
+    const existingNames = new Set(
+      this.basePlaces.map((p) => p.name.trim().toLowerCase())
+    );
+    for (const item of baDataJson as any[]) {
+      const name = String(item.name).trim();
+      if (!existingNames.has(name.toLowerCase())) {
+        existingNames.add(name.toLowerCase());
+        this.basePlaces.push({
+          externalId: String(item.externalId),
+          name: name,
+          location: {
+            lat: Number(item.location.lat),
+            lng: Number(item.location.lng),
+          },
+          address: item.address ? String(item.address) : undefined,
+          tags: item.tags ? (item.tags as Record<string, string>) : undefined,
+          rating: item.rating ? Number(item.rating) : undefined,
+          priceLevel: (item.priceLevel ?? 2) as PriceLevel,
+          zoneId: item.zoneId ? String(item.zoneId) : undefined,
+        });
+      }
+    }
   }
 
   private ensureZoneIds(): void {

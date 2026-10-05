@@ -51,6 +51,15 @@ describe("Places Provider - TDD", () => {
       expect(zones).toContain("amba-moron-castelar");
       expect(zones).toContain("pba-la-plata");
     });
+
+    it("should return official GCBA places and Bares Notables when filtering CABA comunas", async () => {
+      const provider = new MockPlacesProvider();
+      const places = await provider.searchByZones(["caba-1", "caba-4"]);
+      expect(places.length).toBeGreaterThan(10);
+      const notable = places.find((p) => p.tags?.heritage === "bar_notable");
+      expect(notable).toBeDefined();
+      expect(notable?.name).toBeTruthy();
+    });
   });
 
   describe("OpenStreetMapProvider (Overpass API)", () => {

@@ -40,6 +40,20 @@ describe("API Endpoints Integration - TDD", () => {
       expect(zoneIds).toContain("caba-14");
       expect(zoneIds).toContain("amba-vicente-lopez");
     });
+
+    it("should include official GCBA Bares Notables when querying CABA Comuna 1", async () => {
+      const req = new NextRequest("http://localhost:3000/api/places?zones=caba-1");
+      const res = await getPlaces(req);
+      const data = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.places.length).toBeGreaterThan(0);
+      const notable = data.places.find((p: any) =>
+        p.themes.includes("Bodegón") || p.cuisines.includes("Café & Pastelería") || p.cuisines.includes("Argentina")
+      );
+      expect(notable).toBeDefined();
+    });
   });
 
   describe("POST /api/roulette/spin", () => {

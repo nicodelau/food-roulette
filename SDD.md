@@ -1,19 +1,23 @@
 # Software Design Document (SDD) - Food Roulette
-## Fase 4: Selección Múltiple de Comunas y Extensión a AMBA y Provincia de Buenos Aires
+## Fase 5: Ingesta e Integración de Datasets Oficiales de Datos Abiertos de la Ciudad de Buenos Aires (BA Data)
 
 ---
 
 ## 1. Objetivo y Planteamiento del Problema
 
 ### Problema:
-1. **Restricción de Comuna Única:** La selección actual de ubicación está limitada a elegir una única comuna de CABA a la vez. Los usuarios no pueden combinar varias comunas vecinas o de interés simultáneo (por ejemplo, Comuna 14 Palermo + Comuna 15 Villa Crespo/Chacarita + Comuna 13 Belgrano).
-2. **Límite Geográfico Estricto en Capital Federal:** La aplicación actualmente solo contempla las 15 comunas de CABA. Los usuarios que viven o desean salir a comer en el Gran Buenos Aires (AMBA Norte, Oeste, Sur) o polos gastronómicos de la Provincia de Buenos Aires (Gran La Plata, Pilar, etc.) no tienen cobertura ni opciones reales en la ruleta.
+1. **Dispersión y Cobertura Dispar en CABA:** Aunque el catálogo cuenta con restaurantes reales y verificados, la cobertura en varias de las 15 comunas de Capital Federal puede expandirse significativamente aprovechando los datasets públicos oficiales del Gobierno de la Ciudad de Buenos Aires (**BA Data / GCBA**).
+2. **Falta de Reconocimiento de Patrimonio Gastronómico Oficial:** El GCBA cataloga oficialmente espacios gastronómicos culturales emblemáticos (como los **Bares Notables**, cafés históricos y clubes gastronómicos con habilitación oficial), los cuales enriquecen la identidad porteña de la ruleta con historia, coordenadas de precisión y datos verificados por el Ministerio de Cultura.
 
 ### Objetivo:
-- Permitir la **selección múltiple y simultánea de comunas y partidos gastronómicos** (multi-select interactivo).
-- Extender la cobertura geográfica oficial incorporando **AMBA (Zona Norte, Zona Oeste, Zona Sur) y Provincia de Buenos Aires (Gran La Plata, Polos Gastronómicos)**, con zonas estructuradas por región.
-- Enriquecer el catálogo con **restaurantes 100% reales y verificados** de las nuevas áreas de AMBA y PBA, con coordenadas exactas, rango de precios y etiquetas gastronómicas.
-- Actualizar el motor de ruleta (`RouletteEngine`), el proveedor de lugares (`MockPlacesProvider`, `OpenStreetMapProvider`), los endpoints de API (`/api/places`) y la interfaz gráfica (`FilterBar`, `LeafletMap`, `page.tsx`) para soportar búsquedas y filtros multi-zona fluidos.
+- Integrar la fuente oficial abierta de **Buenos Aires Data (GCBA)** en el ecosistema de `food-roulette`.
+- Desarrollar un cargador y normalizador robusto (`BaDataPlacesProvider` / `gcba-dataset-loader.ts`) que procese los registros oficiales y los transforme en `PlaceRaw` y `ClassifiedRestaurant`:
+  - Asignación de `zoneId` correspondiente (`caba-1` a `caba-15`).
+  - Coordenadas geográficas exactas (`lat`, `lng`).
+  - Inferencia temática especializada (reconociendo "BAR NOTABLE", "Bodegón", "Cafetería / Bakery", etc.).
+  - Asignación de rangos de precio (`$`, `$$`, `$$$`).
+- Generar y mantener un snapshot local optimizado (`src/data/ba_data_gastronomia.json`) que garantiza cero latencia y disponibilidad offline sin depender de la red o límites de tasa de la CDN del GCBA, acompañado de un script de actualización automatizado (`scripts/sync_badata.py`).
+- Integrar estos establecimientos oficiales dentro del proveedor de lugares para que los usuarios puedan descubrirlos en la ruleta, mapa y recomendaciones al filtrar por comunas de CABA.
 
 ---
 
@@ -21,182 +25,94 @@
 
 ```mermaid
 flowchart TD
-    UI[FilterBar Component] -->|selectedZoneIds: string[]| State[Page State / Store]
-    State -->|GET /api/places?zones=...| API[/api/places Route]
-    API --> Mock[MockPlacesProvider: CABA + AMBA + PBA]
-    API --> OSM[OpenStreetMapProvider: Multi-center query]
-    API --> Classifier[ClassifierService: Precios & Temas]
-    API -->|ClassifiedRestaurant[]| State
-    State --> Engine[RouletteEngine: Multi-zone & Radius filter]
-    State --> Map[LeafletMap: Multi-marker & Auto-fit bounds]
-    Engine --> Wheel[RouletteWheel: Spin with eligible pool]
+    BAData[Portal Buenos Aires Data GCBA] -->|juqdkmgo-711-resource CSV| Script[scripts/sync_badata.py]
+    Script -->|Limpieza & Normalización| JSONFile[src/data/ba_data_gastronomia.json]
+    JSONFile --> Provider[BaDataPlacesProvider]
+    Provider --> Mock[MockPlacesProvider: CABA Oficial + AMBA/PBA]
+    Mock --> Classifier[ClassifierService: Precios & Temas]
+    Classifier --> API[/api/places & /api/roulette/spin]
+    API --> UI[FilterBar, RouletteWheel, LeafletMap]
 ```
 
-### 1. Modelo de Zonas Gastronómicas (`GastronomicZone`)
-Se formaliza el modelo de zonas geográficas manteniendo compatibilidad retroactiva con `CABA_COMUNAS`:
+### 1. Estructura del Registro Oficial de BA Data
+El dataset oficial de espacios gastronómicos culturales de la Ciudad contiene:
+- `ESTABLECIMIENTO`: Nombre del local (ej. *Los 36 Billares*, *El Federal*, *Bar Británico*, *Bar de Cao*, *La Biela*, *Café Tortoni*, *Las Violetas*).
+- `SUBCATEGORIA`: "BAR NOTABLE", "BAR TRADICIONAL", etc.
+- `FUNCION_PRINCIPAL`: "BAR", "CLUB DE MUSICA EN VIVO", "CENTRO CULTURAL".
+- `CALLE` + `ALTURA` / `DIRECCION`: Domicilio físico verificado.
+- `BARRIO`: Barrio porteño (San Telmo, Palermo, Recoleta, Caballito, Boedo, etc.).
+- `COMUNA`: "COMUNA 1" a "COMUNA 15".
+- `LATITUD` y `LONGITUD`: Coordenadas WGS84.
+- `TELEFONO`, `MAIL`, `WEB`: Información de contacto.
 
-```typescript
-export type ZoneRegion =
-  | "CABA"
-  | "AMBA_NORTE"
-  | "AMBA_OESTE"
-  | "AMBA_SUR"
-  | "PROVINCIA_BSAS";
-
-export interface GastronomicZone {
-  id: string; // ej: "caba-14", "amba-vicente-lopez", "amba-san-isidro", "amba-moron", "amba-lomas", "pba-la-plata"
-  region: ZoneRegion;
-  regionLabel: string;
-  name: string;
-  numberLabel?: string;
-  barrios: string[];
-  location: Coordinates;
-  radiusKm?: number;
-}
-```
-
-### 2. Estructura de Regiones y Partidos
-- **CABA (15 Comunas):** Comunas 1 a 15 con todos sus barrios (Palermo, Recoleta, San Telmo, Belgrano, Caballito, Devoto, etc.).
-- **AMBA Norte:**
-  - Vicente López (Olivos, Florida, Vicente López Centro, La Lucila)
-  - San Isidro (San Isidro Centro, Acassuso, Martínez, Boulogne)
-  - San Fernando (San Fernando, Victoria)
-  - Tigre (Tigre Centro, Delta, Rincón de Milberg, Nordelta)
-  - San Martín (San Martín, Villa Ballester)
-  - Pilar (Pilar Centro, Panamericana km 50)
-- **AMBA Oeste:**
-  - Morón / Castelar (Morón Centro, Castelar, Haedo)
-  - Ramos Mejía / La Matanza (Ramos Mejía, San Justo)
-  - Tres de Febrero (Caseros, Ciudad Jardín)
-  - Ituzaingó / Parque Leloir (Parque Leloir, Ituzaingó Centro)
-- **AMBA Sur:**
-  - Lomas de Zamora (Las Lomitas, Banfield, Temperley)
-  - Quilmes (Quilmes Centro, Bernal)
-  - Lanús (Lanucita polo gastronómico, Lanús Oeste)
-  - Avellaneda (Avellaneda Centro, Wilde)
-  - Almirante Brown (Adrogué, Burzaco)
-- **Gran La Plata & Provincia de Bs As:**
-  - La Plata Centro (Plaza Moreno, Eje Fundacional)
-  - City Bell & Gonnet (Polo gastronómico Cantilo)
-  - Campana / Zárate
-  - Polos de campo (Mercedes / Tomás Jofré, San Antonio de Areco)
-
-### 3. Enriquecimiento del Catálogo de Restaurantes Reales
-Se añaden locales 100% reales en AMBA y PBA:
-- **Vicente López & San Isidro:** Alo's Bistro (San Isidro/Boulogne), Cut Parrilla (Olivos), Asato Sushi (Olivos), La Rosa Negra (San Isidro), El Hornero (San Isidro).
-- **Tigre & Delta:** Il Novo María del Luján (Paseo Victorica, Tigre), Kanoo Cocina de Río.
-- **Morón, Castelar & Parque Leloir:** Bruce Grill Station (Parque Leloir), Kansas Grill Leloir, Don Battaglia (Castelar), The Galley Burgers (Morón).
-- **Ramos Mejía:** Cervecería Baum (Ramos Mejía), Lo de Carlitos (Av. de Mayo).
-- **Lomas de Zamora (Las Lomitas), Lanús & Quilmes:** Bodega Las Lomitas (Italia 450), Antares Las Lomitas, Taberna de Lanús (Lanucita), Parque Cervecero Quilmes.
-- **La Plata & City Bell:** Baxar Mercado Gastronómico (Calle 51), Paesano Ristorante (City Bell), Café Urquiza (La Plata).
+### 2. Normalización a `PlaceRaw`
+- `externalId`: `badata-{fid}`
+- `name`: `ESTABLECIMIENTO`
+- `location`: `{ lat: Number(LATITUD), lng: Number(LONGITUD) }`
+- `address`: `DIRECCION`
+- `zoneId`: Mapeo directo `COMUNA X` $\rightarrow$ `caba-X`
+- `tags`:
+  - `amenity`: "cafe" o "bar" o "restaurant"
+  - `cuisine`: Inferencia basada en nombre y categorías (ej. tradicional, porteña, café)
+  - `heritage`: "bar_notable" si corresponde a la subcategoría oficial.
 
 ---
 
 ## 3. Cambios en APIs e Interfaces
 
-### 1. `src/domain/types.ts`
+### 1. `src/domain/places/badata-places-provider.ts`
 ```typescript
-export interface PlaceRaw {
-  externalId: string;
-  name: string;
-  location: Coordinates;
-  address?: string;
-  tags?: Record<string, string>;
-  rating?: number;
-  priceLevel?: PriceLevel;
-  zoneId?: string;
+export interface BaDataRawRecord {
+  fid: string | number;
+  ESTABLECIMIENTO: string;
+  FUNCION_PRINCIPAL?: string;
+  SUBCATEGORIA?: string;
+  DIRECCION: string;
+  BARRIO: string;
+  COMUNA: string;
+  LATITUD: string | number;
+  LONGITUD: string | number;
+  TELEFONO?: string;
+  WEB?: string;
 }
 
-export interface ClassifiedRestaurant {
-  id: string;
-  externalId: string;
-  name: string;
-  location: Coordinates;
-  address: string;
-  cuisines: string[];
-  themes: string[];
-  dietarySuitability: DietaryRestriction[];
-  priceLevel: PriceLevel;
-  rating?: number;
-  zoneId?: string;
-}
-
-export interface RouletteFilterOptions {
-  userLocation: Coordinates;
-  radiusKm: number;
-  selectedZoneIds?: string[];
-  selectedCuisines?: string[];
-  selectedThemes?: string[];
-  selectedPriceLevels?: PriceLevel[];
-  requiredDietary?: DietaryRestriction[];
-  excludeVisited?: boolean;
-  visitedIds?: string[];
-  blacklistedIds?: string[];
+export class BaDataPlacesProvider implements IPlacesProvider {
+  searchNearby(params: SearchNearbyParams): Promise<PlaceRaw[]>;
+  searchByZones(zoneIds: string[]): Promise<PlaceRaw[]>;
+  getNotableBars(): Promise<PlaceRaw[]>;
 }
 ```
 
-### 2. `src/domain/roulette/roulette-engine.ts`
-- Se incorpora `selectedZoneIds?: string[]` a `SpinParams`.
-- Lógica de elegibilidad espacial:
-  - Si `selectedZoneIds` está activo ($\ge 1$), un restaurante es elegible si su `zoneId` coincide con alguno de los seleccionados, o si su proximidad a cualquiera de los centros de las zonas seleccionadas está dentro del radio.
-  - Si `selectedZoneIds` está vacío, se aplica el filtro estándar por `userLocation` y `radiusKm` (GPS / clic en mapa).
-
-### 3. `src/app/api/places/route.ts`
-- Acepta query param opcional `zones` (ej: `?zones=caba-14,amba-vicente-lopez,amba-lomas`).
-- Devuelve todos los restaurantes pertenecientes a las zonas seleccionadas o cercanos a las coordenadas proporcionadas.
-
-### 4. Componentes UI:
-- **`FilterBar.tsx`:**
-  - Selector multi-zona con pestañas/acordeón de regiones (`CABA`, `AMBA Norte`, `AMBA Oeste`, `AMBA Sur`, `Provincia / La Plata`).
-  - Chips interactivos con checkboxes, badge de conteo (`"3 zonas seleccionadas"`), botón "Seleccionar todas de CABA" y tags removibles con botón "X".
-  - Opción de conmutar a "Mi GPS" para búsqueda por radio geolocalizado.
-- **`LeafletMap.tsx`:**
-  - Auto-ajuste de vista (`fitBounds`) para encuadrar todos los pines de las múltiples zonas seleccionadas sin perder legibilidad.
+### 2. Integración en `MockPlacesProvider`
+`MockPlacesProvider` unificará el catálogo oficial de BA Data para CABA con la selección verificada de locales de AMBA y PBA.
 
 ---
 
 ## 4. Plan de Pruebas (TDD)
 
 ### A. Casos de Éxito (Happy Paths)
-1. **Catálogo Unificado de Zonas (`zones.test.ts`):**
-   - Mantiene las 15 comunas de CABA con sus IDs y coordenadas válidas.
-   - Provee zonas de AMBA Norte, Oeste, Sur y PBA con coordenadas válidas dentro del conurbano y provincia.
-   - Permite filtrar zonas por región (`filterZonesByRegion("AMBA_NORTE")`).
-2. **Filtrado Multi-Zona en `RouletteEngine` (`roulette-engine.test.ts`):**
-   - Al seleccionar múltiples `selectedZoneIds` (ej: `["caba-14", "amba-vicente-lopez"]`), el motor incluye restaurantes de ambas zonas y descarta los de otras comunas (ej: `caba-1`).
-   - Respeta de forma conjunta los filtros de `selectedPriceLevels` y `requiredDietary` sobre las múltiples comunas.
-3. **Catálogo Real de AMBA / PBA en `MockPlacesProvider` (`places-provider.test.ts`):**
-   - Retorna restaurantes verificados en Vicente López, San Isidro, Morón, Lomas de Zamora y La Plata.
-   - `searchByZones(["amba-moron", "amba-lomas"])` retorna los locales de Zona Oeste y Sur solicitados.
-4. **Endpoint API `/api/places` (`api-endpoints.test.ts`):**
-   - La consulta `GET /api/places?zones=caba-14,amba-vicente-lopez` responde `200` con restaurantes de Palermo y Vicente López.
+1. **Carga y Normalización (`badata-places-provider.test.ts`):**
+   - Transforma correctamente registros de BA Data a `PlaceRaw` válidos.
+   - Normaliza cadenas como `"COMUNA 14"` a `"caba-14"`.
+   - Asigna tags de `heritage: "bar_notable"` a locales con subcategoría `BAR NOTABLE`.
+2. **Cobertura de Comunas:**
+   - Cada una de las 15 comunas de CABA cuenta con establecimientos oficiales verificados con coordenadas válidas.
+3. **Búsqueda por Zonas y Cercanía:**
+   - `searchByZones(["caba-1", "caba-14"])` devuelve locales oficiales de Comuna 1 y Comuna 14.
+   - `searchNearby({ lat, lng, radiusKm })` calcula distancias Haversine correctas hacia los puntos de BA Data.
+4. **Integración con `ClassifierService`:**
+   - Los locales de BA Data son clasificados con éxito con `priceLevel` (1 o 2) y temas relevantes (*Bodegón*, *Bar / Cervecería*, *Cafetería / Bakery*).
 
 ### B. Casos de Fallo y Errores (Edge Cases)
-1. **Zonas sin restaurantes que cumplan filtros estrictos:** `RouletteEngine` lanza `NoEligibleRestaurantsError` indicando ampliar los criterios o zonas.
-2. **IDs de zona inválidos o desconocidos:** Fallback defensivo que descarta IDs inexistentes sin romper la consulta ni retornar error 500.
+1. **Coordenadas inválidas o vacías en registros:** Descarta registros corruptos sin romper la carga de los válidos.
+2. **Comuna no reconocida:** Asigna la comuna por barrio o por cercanía a centros de comunas de CABA en lugar de fallar.
 
 ---
 
 ## 5. Plan de Implementación (Paso a Paso)
 
-1. [ ] **Fase 1 (Zonas & Modelos):**
-   - Crear catálogo completo de zonas en `src/domain/zones/gastronomic-zones.ts` (15 comunas CABA + 15+ partidos AMBA/PBA).
-   - Mantener retrocompatibilidad en `src/domain/caba/comunas.ts`.
-   - Escribir tests unitarios en `src/domain/zones/__tests__/zones.test.ts`.
-2. [ ] **Fase 2 (Catálogo Real & Proveedor de Lugares):**
-   - Incorporar restaurantes 100% reales de AMBA y PBA con coordenadas verificadas en `MockPlacesProvider`.
-   - Implementar método `searchByZones` y actualizar `searchNearby`.
-   - Escribir tests unitarios en `places-provider.test.ts`.
-3. [ ] **Fase 3 (Motor de Ruleta Multi-Zona):**
-   - Actualizar `RouletteEngine` para soportar `selectedZoneIds`.
-   - Escribir tests en `roulette-engine.test.ts`.
-4. [ ] **Fase 4 (Endpoint API `/api/places`):**
-   - Soportar query param `zones` en `/api/places/route.ts`.
-   - Escribir tests de integración en `api-endpoints.test.ts`.
-5. [ ] **Fase 5 (Interfaz de Usuario):**
-   - Actualizar `FilterBar.tsx` con selector multi-zona agrupado por región (CABA, AMBA Norte/Oeste/Sur, La Plata/PBA) y chips interactivos.
-   - Actualizar `page.tsx` para sincronizar `selectedZoneIds` con el mapa, ruleta y API.
-   - Actualizar `LeafletMap.tsx` con ajuste dinámico de límites (`fitBounds`).
-6. [ ] **Fase 6 (Verificación & Calidad):**
-   - Ejecutar la suite completa de tests con Vitest (`npm test`).
-   - Validar build de producción (`npm run build`).
+1. [ ] **TDD Fase 1:** Escribir pruebas unitarias en `src/domain/places/__tests__/badata-places-provider.test.ts`.
+2. [ ] **TDD Fase 2:** Desarrollar `BaDataPlacesProvider` y el script de extracción/snapshot `scripts/sync_badata.py` generando `src/data/ba_data_gastronomia.json`.
+3. [ ] **TDD Fase 3:** Integrar `BaDataPlacesProvider` en `MockPlacesProvider` para nutrir todas las comunas de CABA con los datos abiertos oficiales.
+4. [ ] **TDD Fase 4:** Verificar con Vitest que los 47+ tests continúen en verde y que los nuevos tests de BA Data pasen al 100%.
+5. [ ] **Verificación de Build & Git:** Ejecutar build de producción Next.js y actualizar memoria estática.
