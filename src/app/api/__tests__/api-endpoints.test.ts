@@ -27,6 +27,19 @@ describe("API Endpoints Integration - TDD", () => {
       expect(data.success).toBe(true);
       expect(data.places.length).toBeGreaterThan(0);
     }, 10000);
+
+    it("should return classified places filtered by multiple zones (CABA + AMBA)", async () => {
+      const req = new NextRequest("http://localhost:3000/api/places?mock=true&zones=caba-14,amba-vicente-lopez");
+      const res = await getPlaces(req);
+      const data = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.places.length).toBeGreaterThan(0);
+      const zoneIds = data.places.map((p: any) => p.zoneId);
+      expect(zoneIds).toContain("caba-14");
+      expect(zoneIds).toContain("amba-vicente-lopez");
+    });
   });
 
   describe("POST /api/roulette/spin", () => {

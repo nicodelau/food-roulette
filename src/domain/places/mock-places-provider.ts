@@ -493,7 +493,358 @@ export class MockPlacesProvider implements IPlacesProvider {
       tags: { cuisine: "cafe;bakery;heladeria", amenity: "cafe" },
       rating: 4.5,
     },
+
+    // AMBA Norte: Vicente López
+    {
+      externalId: "amba-vl-1",
+      name: "Cut Parrilla Olivos",
+      location: { lat: -34.5126, lng: -58.4842 },
+      address: "Av. del Libertador 2418, Olivos",
+      tags: { cuisine: "argentinian;parrilla;steakhouse", amenity: "restaurant" },
+      rating: 4.8,
+      priceLevel: 3,
+      zoneId: "amba-vicente-lopez",
+    },
+    {
+      externalId: "amba-vl-2",
+      name: "Asato Sushi Olivos",
+      location: { lat: -34.5152, lng: -58.4871 },
+      address: "Corrientes 584, Olivos",
+      tags: { cuisine: "japanese;sushi;asian", amenity: "restaurant" },
+      rating: 4.9,
+      priceLevel: 3,
+      zoneId: "amba-vicente-lopez",
+    },
+    {
+      externalId: "amba-vl-3",
+      name: "La Farola de Olivos",
+      location: { lat: -34.5218, lng: -58.4883 },
+      address: "Av. Maipú 2700, Olivos",
+      tags: { cuisine: "argentinian;pizza;milanesa", amenity: "restaurant" },
+      rating: 4.3,
+      priceLevel: 1,
+      zoneId: "amba-vicente-lopez",
+    },
+
+    // AMBA Norte: San Isidro
+    {
+      externalId: "amba-si-1",
+      name: "Alo's Bistro San Isidro",
+      location: { lat: -34.4984, lng: -58.5412 },
+      address: "Blanco Encalada 2120, Boulogne",
+      tags: { cuisine: "gourmet;de_autor;french", amenity: "restaurant" },
+      rating: 4.9,
+      priceLevel: 3,
+      zoneId: "amba-san-isidro",
+    },
+    {
+      externalId: "amba-si-2",
+      name: "La Rosa Negra",
+      location: { lat: -34.4912, lng: -58.5132 },
+      address: "Dardo Rocha 1918, Martínez",
+      tags: { cuisine: "argentinian;international;bar", amenity: "restaurant" },
+      rating: 4.6,
+      priceLevel: 3,
+      zoneId: "amba-san-isidro",
+    },
+    {
+      externalId: "amba-si-3",
+      name: "El Hornero Parrilla",
+      location: { lat: -34.4754, lng: -58.5321 },
+      address: "Juan Segundo Fernández 151, San Isidro",
+      tags: { cuisine: "argentinian;parrilla", amenity: "restaurant" },
+      rating: 4.5,
+      priceLevel: 2,
+      zoneId: "amba-san-isidro",
+    },
+
+    // AMBA Norte: Tigre
+    {
+      externalId: "amba-tigre-1",
+      name: "Il Novo María del Luján",
+      location: { lat: -34.4172, lng: -58.5778 },
+      address: "Paseo Victorica 511, Tigre",
+      tags: { cuisine: "italian;pasta;seafood", amenity: "restaurant" },
+      rating: 4.7,
+      priceLevel: 2,
+      zoneId: "amba-tigre",
+    },
+    {
+      externalId: "amba-tigre-2",
+      name: "Kanoo Cocina de Río",
+      location: { lat: -34.4095, lng: -58.5632 },
+      address: "Río Sarmiento 398, Delta Tigre",
+      tags: { cuisine: "argentinian;seafood;de_autor", amenity: "restaurant" },
+      rating: 4.7,
+      priceLevel: 2,
+      zoneId: "amba-tigre",
+    },
+
+    // AMBA Norte: San Martín & Pilar
+    {
+      externalId: "amba-sm-1",
+      name: "Bodegón La Chicha",
+      location: { lat: -34.5512, lng: -58.5524 },
+      address: "Lacroze 4800, Villa Ballester",
+      tags: { cuisine: "argentinian;bodegon;traditional", amenity: "restaurant" },
+      rating: 4.5,
+      priceLevel: 1,
+      zoneId: "amba-san-martin",
+    },
+    {
+      externalId: "amba-pilar-1",
+      name: "La Aldea Parrilla Pilar",
+      location: { lat: -34.4532, lng: -58.8891 },
+      address: "Panamericana Km 44, Pilar",
+      tags: { cuisine: "argentinian;parrilla", amenity: "restaurant" },
+      rating: 4.6,
+      priceLevel: 2,
+      zoneId: "amba-pilar",
+    },
+
+    // AMBA Oeste: Morón & Castelar
+    {
+      externalId: "amba-moron-1",
+      name: "Don Battaglia Trattoria",
+      location: { lat: -34.6538, lng: -58.6291 },
+      address: "Carlos Casares 948, Castelar",
+      tags: { cuisine: "italian;bodegon;pasta", amenity: "restaurant" },
+      rating: 4.7,
+      priceLevel: 2,
+      zoneId: "amba-moron-castelar",
+    },
+    {
+      externalId: "amba-moron-2",
+      name: "The Galley Burger Morón",
+      location: { lat: -34.6519, lng: -58.6183 },
+      address: "Brown 828, Morón",
+      tags: { cuisine: "burger;american;casual", amenity: "restaurant" },
+      rating: 4.6,
+      priceLevel: 1,
+      zoneId: "amba-moron-castelar",
+    },
+
+    // AMBA Oeste: Ramos Mejía
+    {
+      externalId: "amba-rm-1",
+      name: "Cervecería Baum Ramos Mejía",
+      location: { lat: -34.6468, lng: -58.5658 },
+      address: "Av. de Mayo 600, Ramos Mejía",
+      tags: { cuisine: "burger;brewery;pub", amenity: "pub" },
+      rating: 4.5,
+      priceLevel: 2,
+      zoneId: "amba-ramos-mejia",
+    },
+    {
+      externalId: "amba-rm-2",
+      name: "Lo de Carlitos Ramos Mejía",
+      location: { lat: -34.6441, lng: -58.5645 },
+      address: "Av. de Mayo 280, Ramos Mejía",
+      tags: { cuisine: "argentinian;crepes;casual", amenity: "restaurant" },
+      rating: 4.4,
+      priceLevel: 1,
+      zoneId: "amba-ramos-mejia",
+    },
+
+    // AMBA Oeste: Parque Leloir & Tres de Febrero
+    {
+      externalId: "amba-leloir-1",
+      name: "Bruce Grill Station Leloir",
+      location: { lat: -34.6228, lng: -58.6871 },
+      address: "Martín Fierro 3246, Parque Leloir",
+      tags: { cuisine: "american;bbq;steakhouse", amenity: "restaurant" },
+      rating: 4.8,
+      priceLevel: 3,
+      zoneId: "amba-parque-leloir",
+    },
+    {
+      externalId: "amba-leloir-2",
+      name: "Kansas Grill Parque Leloir",
+      location: { lat: -34.6235, lng: -58.6892 },
+      address: "Martín Fierro 3361, Parque Leloir",
+      tags: { cuisine: "american;steakhouse;contemporary", amenity: "restaurant" },
+      rating: 4.8,
+      priceLevel: 3,
+      zoneId: "amba-parque-leloir",
+    },
+    {
+      externalId: "amba-tdf-1",
+      name: "Tip Top Cervecería Ciudad Jardín",
+      location: { lat: -34.5985, lng: -58.5881 },
+      address: "Boulevard San Martín 2980, Ciudad Jardín",
+      tags: { cuisine: "german;pub;casual", amenity: "pub" },
+      rating: 4.5,
+      priceLevel: 1,
+      zoneId: "amba-tres-de-febrero",
+    },
+
+    // AMBA Sur: Lomas de Zamora (Las Lomitas)
+    {
+      externalId: "amba-lomas-1",
+      name: "Bodega Las Lomitas",
+      location: { lat: -34.7621, lng: -58.4024 },
+      address: "Italia 450, Lomas de Zamora",
+      tags: { cuisine: "argentinian;wine_bar;tapas", amenity: "restaurant" },
+      rating: 4.7,
+      priceLevel: 2,
+      zoneId: "amba-lomas-de-zamora",
+    },
+    {
+      externalId: "amba-lomas-2",
+      name: "Antares Las Lomitas",
+      location: { lat: -34.7615, lng: -58.4018 },
+      address: "Sixto Fernández 289, Las Lomitas",
+      tags: { cuisine: "burger;brewery;bar_food", amenity: "pub" },
+      rating: 4.5,
+      priceLevel: 2,
+      zoneId: "amba-lomas-de-zamora",
+    },
+
+    // AMBA Sur: Quilmes & Lanús
+    {
+      externalId: "amba-quilmes-1",
+      name: "Parque Cervecero Quilmes",
+      location: { lat: -34.7265, lng: -58.2678 },
+      address: "Av. 12 de Octubre y Gran Canaria, Quilmes",
+      tags: { cuisine: "brewery;traditional;parrilla", amenity: "restaurant" },
+      rating: 4.7,
+      priceLevel: 2,
+      zoneId: "amba-quilmes",
+    },
+    {
+      externalId: "amba-lanus-1",
+      name: "Taberna de Lanús",
+      location: { lat: -34.7042, lng: -58.3912 },
+      address: "Del Valle Iberlucea 2750, Lanucita",
+      tags: { cuisine: "spanish;tapas;wine_bar", amenity: "restaurant" },
+      rating: 4.6,
+      priceLevel: 2,
+      zoneId: "amba-lanus",
+    },
+    {
+      externalId: "amba-lanus-2",
+      name: "Guten Bier Lanús",
+      location: { lat: -34.7031, lng: -58.3908 },
+      address: "Del Valle Iberlucea 2650, Lanús",
+      tags: { cuisine: "brewery;burger;pub", amenity: "pub" },
+      rating: 4.4,
+      priceLevel: 2,
+      zoneId: "amba-lanus",
+    },
+
+    // AMBA Sur: Avellaneda & Adrogué
+    {
+      externalId: "amba-avell-1",
+      name: "Pizzería Los Campeones",
+      location: { lat: -34.6642, lng: -58.3685 },
+      address: "Av. Mitre 500, Avellaneda",
+      tags: { cuisine: "pizza;italian", amenity: "restaurant" },
+      rating: 4.6,
+      priceLevel: 1,
+      zoneId: "amba-avellaneda",
+    },
+    {
+      externalId: "amba-adrogue-1",
+      name: "Folies Bistro Adrogué",
+      location: { lat: -34.7972, lng: -58.3892 },
+      address: "Mitre 1050, Adrogué",
+      tags: { cuisine: "french;de_autor;bistro", amenity: "restaurant" },
+      rating: 4.8,
+      priceLevel: 3,
+      zoneId: "amba-almirante-brown",
+    },
+
+    // Provincia de Buenos Aires: La Plata & City Bell
+    {
+      externalId: "pba-lp-1",
+      name: "Baxar Mercado Gastronómico",
+      location: { lat: -34.9152, lng: -57.9482 },
+      address: "Calle 51 entre 5 y 6, La Plata",
+      tags: { cuisine: "varied;gourmet;market", amenity: "restaurant" },
+      rating: 4.8,
+      priceLevel: 2,
+      zoneId: "pba-la-plata",
+    },
+    {
+      externalId: "pba-lp-2",
+      name: "Café Urquiza La Plata",
+      location: { lat: -34.9254, lng: -57.9582 },
+      address: "Calle 13 y 56, La Plata",
+      tags: { cuisine: "cafe;bakery;bistro", amenity: "cafe" },
+      rating: 4.7,
+      priceLevel: 2,
+      zoneId: "pba-la-plata",
+    },
+    {
+      externalId: "pba-cb-1",
+      name: "Paesano Ristorante City Bell",
+      location: { lat: -34.8624, lng: -58.0441 },
+      address: "Calle 13C y Cantilo, City Bell",
+      tags: { cuisine: "italian;pizza;pasta", amenity: "restaurant" },
+      rating: 4.8,
+      priceLevel: 2,
+      zoneId: "pba-city-bell",
+    },
+    {
+      externalId: "pba-merc-1",
+      name: "Restaurante Silvano Tomás Jofré",
+      location: { lat: -34.6712, lng: -59.3812 },
+      address: "Calle Principal s/n, Tomás Jofré, Mercedes",
+      tags: { cuisine: "argentinian;campo;pasta;parrilla", amenity: "restaurant" },
+      rating: 4.7,
+      priceLevel: 2,
+      zoneId: "pba-mercedes-areco",
+    },
   ];
+
+  constructor() {
+    this.ensureZoneIds();
+  }
+
+  private ensureZoneIds(): void {
+    for (const place of this.basePlaces) {
+      if (!place.zoneId) {
+        place.zoneId = this.inferZoneId(place);
+      }
+    }
+  }
+
+  private inferZoneId(place: PlaceRaw): string {
+    const addr = (place.address || "").toLowerCase();
+    if (addr.includes("palermo")) return "caba-14";
+    if (
+      addr.includes("san telmo") ||
+      addr.includes("centro") ||
+      addr.includes("montserrat") ||
+      addr.includes("puerto madero") ||
+      addr.includes("retiro")
+    )
+      return "caba-1";
+    if (addr.includes("recoleta")) return "caba-2";
+    if (
+      addr.includes("belgrano") ||
+      addr.includes("barrio chino") ||
+      addr.includes("núñez")
+    )
+      return "caba-13";
+    if (addr.includes("villa crespo") || addr.includes("chacarita"))
+      return "caba-15";
+    if (addr.includes("caballito")) return "caba-6";
+    if (addr.includes("almagro") || addr.includes("boedo")) return "caba-5";
+    if (addr.includes("la boca") || addr.includes("barracas")) return "caba-4";
+    if (addr.includes("devoto")) return "caba-11";
+    if (addr.includes("urquiza") || addr.includes("saavedra")) return "caba-12";
+    if (addr.includes("flores")) return "caba-7";
+    return "caba-14";
+  }
+
+  async searchByZones(zoneIds: string[]): Promise<PlaceRaw[]> {
+    if (!zoneIds || zoneIds.length === 0) {
+      return this.basePlaces.slice(0, 40);
+    }
+    const zoneSet = new Set(zoneIds);
+    return this.basePlaces.filter((p) => p.zoneId && zoneSet.has(p.zoneId));
+  }
 
   private calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
     const R = 6371;

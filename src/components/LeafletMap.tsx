@@ -207,6 +207,15 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({
           map.setView([r.location.lat, r.location.lng], 15, { animate: true });
         }
       });
+
+      if (!selectedRestaurant && restaurants.length > 1) {
+        try {
+          const group = L.featureGroup(markersRef.current);
+          map.fitBounds(group.getBounds().pad(0.15), { maxZoom: 15, animate: true });
+        } catch {
+          // Ignore bounds errors if coordinates are identical
+        }
+      }
     });
 
     return () => {

@@ -156,6 +156,143 @@ describe("RouletteEngine - TDD", () => {
     expect(candidateIds).not.toContain("rest-1");
   });
 
+  it("should filter by multiple selectedZoneIds (e.g. Comuna 14 + Vicente López)", () => {
+    const multiZonePool: ClassifiedRestaurant[] = [
+      {
+        id: "rest-caba-1",
+        externalId: "ext-c1",
+        name: "Güerrin Centro",
+        location: { lat: -34.6042, lng: -58.3862 },
+        address: "Av. Corrientes 1368",
+        cuisines: ["Italiana"],
+        themes: ["Pizzería"],
+        dietarySuitability: ["VEGETARIAN"],
+        priceLevel: 1,
+        zoneId: "caba-1",
+      },
+      {
+        id: "rest-caba-14",
+        externalId: "ext-c14",
+        name: "Don Julio Palermo",
+        location: { lat: -34.5888, lng: -58.4239 },
+        address: "Guatemala 4699",
+        cuisines: ["Argentina"],
+        themes: ["Parrilla / Asador"],
+        dietarySuitability: [],
+        priceLevel: 3,
+        zoneId: "caba-14",
+      },
+      {
+        id: "rest-amba-vlopez",
+        externalId: "ext-nvl",
+        name: "Cut Parrilla Olivos",
+        location: { lat: -34.512, lng: -58.482 },
+        address: "Av. Libertador 2418, Olivos",
+        cuisines: ["Argentina"],
+        themes: ["Parrilla / Asador"],
+        dietarySuitability: ["CELIAC"],
+        priceLevel: 2,
+        zoneId: "amba-vicente-lopez",
+      },
+      {
+        id: "rest-amba-moron",
+        externalId: "ext-moron",
+        name: "Don Battaglia Castelar",
+        location: { lat: -34.653, lng: -58.62 },
+        address: "Carlos Casares 948, Castelar",
+        cuisines: ["Italiana"],
+        themes: ["Bodegón"],
+        dietarySuitability: [],
+        priceLevel: 2,
+        zoneId: "amba-moron-castelar",
+      },
+      {
+        id: "rest-pba-laplata",
+        externalId: "ext-laplata",
+        name: "Baxar Mercado La Plata",
+        location: { lat: -34.921, lng: -57.954 },
+        address: "Calle 51, La Plata",
+        cuisines: ["Variada"],
+        themes: ["Casual"],
+        dietarySuitability: ["VEGAN"],
+        priceLevel: 2,
+        zoneId: "pba-la-plata",
+      },
+    ];
+
+    const result = engine.spin({
+      pool: multiZonePool,
+      userLocation: { lat: -34.5888, lng: -58.4239 },
+      radiusKm: 20.0,
+      selectedZoneIds: ["caba-14", "amba-vicente-lopez"],
+    });
+
+    expect(result.totalEligibleCandidates).toBe(2);
+    const ids = result.eligibleCandidates.map((r) => r.id);
+    expect(ids).toContain("rest-caba-14");
+    expect(ids).toContain("rest-amba-vlopez");
+    expect(ids).not.toContain("rest-caba-1");
+    expect(ids).not.toContain("rest-amba-moron");
+    expect(ids).not.toContain("rest-pba-laplata");
+  });
+
+  it("should combine selectedZoneIds with priceLevel and dietary restrictions", () => {
+    const multiZonePool: ClassifiedRestaurant[] = [
+      {
+        id: "rest-caba-14-expensive",
+        externalId: "ext-1",
+        name: "Lujo Palermo",
+        location: { lat: -34.5888, lng: -58.4239 },
+        address: "Palermo",
+        cuisines: ["Argentina"],
+        themes: ["Parrilla / Asador"],
+        dietarySuitability: ["CELIAC"],
+        priceLevel: 3,
+        zoneId: "caba-14",
+      },
+      {
+        id: "rest-caba-14-cheap",
+        externalId: "ext-2",
+        name: "Panchería Palermo",
+        location: { lat: -34.5888, lng: -58.4239 },
+        address: "Palermo",
+        cuisines: ["Americana / Burgers"],
+        themes: ["Casual"],
+        dietarySuitability: [],
+        priceLevel: 1,
+        zoneId: "caba-14",
+      },
+      {
+        id: "rest-amba-vlopez-medium",
+        externalId: "ext-3",
+        name: "Bistro Olivos",
+        location: { lat: -34.512, lng: -58.482 },
+        address: "Olivos",
+        cuisines: ["Argentina"],
+        themes: ["Romántico / De Autor"],
+        dietarySuitability: ["CELIAC"],
+        priceLevel: 2,
+        zoneId: "amba-vicente-lopez",
+      },
+    ];
+
+    // Select caba-14 + amba-vicente-lopez, priceLevel: 2 or 3, dietary: CELIAC
+    const result = engine.spin({
+      pool: multiZonePool,
+      userLocation: { lat: -34.5888, lng: -58.4239 },
+      radiusKm: 20.0,
+      selectedZoneIds: ["caba-14", "amba-vicente-lopez"],
+      selectedPriceLevels: [2, 3],
+      requiredDietary: ["CELIAC"],
+    });
+
+    expect(result.totalEligibleCandidates).toBe(2);
+    const ids = result.eligibleCandidates.map((r) => r.id);
+    expect(ids).toContain("rest-caba-14-expensive");
+    expect(ids).toContain("rest-amba-vlopez-medium");
+    expect(ids).not.toContain("rest-caba-14-cheap");
+  });
+
   it("should throw NoEligibleRestaurantsError when all candidates are filtered out", () => {
     expect(() =>
       engine.spin({
@@ -169,4 +306,5 @@ describe("RouletteEngine - TDD", () => {
     ).toThrow(NoEligibleRestaurantsError);
   });
 });
+
 

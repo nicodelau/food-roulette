@@ -6,11 +6,13 @@ import {
   RouletteResult,
 } from "../types";
 import { NoEligibleRestaurantsError } from "./errors";
+import { getZoneById } from "../zones/gastronomic-zones";
 
 export interface SpinParams {
   pool: ClassifiedRestaurant[];
   userLocation: Coordinates;
   radiusKm: number;
+  selectedZoneIds?: string[];
   selectedCuisines?: string[];
   selectedThemes?: string[];
   selectedPriceLevels?: PriceLevel[];
@@ -51,6 +53,7 @@ export class RouletteEngine {
       pool,
       userLocation,
       radiusKm,
+      selectedZoneIds = [],
       selectedCuisines = [],
       selectedThemes = [],
       selectedPriceLevels = [],
@@ -62,6 +65,7 @@ export class RouletteEngine {
 
     const visitedSet = new Set(visitedIds);
     const blacklistSet = new Set(blacklistedIds);
+    const zoneSet = new Set(selectedZoneIds);
 
     const eligibleCandidates = pool.filter((restaurant) => {
       // 1. Filtro de lista negra
@@ -77,10 +81,29 @@ export class RouletteEngine {
         return false;
       }
 
-      // 3. Filtro geográfico por radio
-      const distance = this.calculateDistanceKm(userLocation, restaurant.location);
-      if (distance > radiusKm) {
-        return false;
+      // 3. Filtro geográfico / Zonas
+      if (zoneSet.size > 0) {
+        if (restaurant.zoneId) {
+          if (!zoneSet.has(restaurant.zoneId)) {
+            return false;
+          }
+        } else {
+          // Fallback para lugares sin zoneId explícito: verificar proximidad a cualquiera de las zonas seleccionadas
+          const matchesAnySelectedZone = selectedZoneIds.some((zId) => {
+            const zone = getZoneById(zId);
+            if (!zone) return false;
+            const dist = this.calculateDistanceKm(zone.location, restaurant.location);
+            return dist <= (zone.radiusKm ?? radiusKm);
+          });
+          if (!matchesAnySelectedZone) {
+            return false;
+          }
+        }
+      } else {
+        const distance = this.calculateDistanceKm(userLocation, restaurant.location);
+        if (distance > radiusKm) {
+          return false;
+        }
       }
 
       // 4. Filtro de restricciones dietarias (debe cumplir con todas las requeridas)

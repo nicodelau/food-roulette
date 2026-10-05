@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
       pool: body.pool,
       userLocation: body.userLocation,
       radiusKm: body.radiusKm ?? 3.0,
+      selectedZoneIds: body.selectedZoneIds,
       selectedCuisines: body.selectedCuisines,
       selectedThemes: body.selectedThemes,
       selectedPriceLevels: body.selectedPriceLevels,

@@ -11,6 +11,7 @@ const classifier = new ClassifierService();
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
+    const zonesParam = searchParams.get("zones");
     const latStr = searchParams.get("lat");
     const lngStr = searchParams.get("lng");
     const radiusStr = searchParams.get("radiusKm");
@@ -22,7 +23,13 @@ export async function GET(request: NextRequest) {
     const radiusKm = radiusStr ? parseFloat(radiusStr) : 2.5;
 
     let rawPlaces;
-    if (useMock) {
+    if (zonesParam) {
+      const zoneIds = zonesParam
+        .split(",")
+        .map((z) => z.trim())
+        .filter(Boolean);
+      rawPlaces = await mockProvider.searchByZones(zoneIds);
+    } else if (useMock) {
       rawPlaces = await mockProvider.searchNearby({ lat, lng, radiusKm });
     } else {
       try {

@@ -37,6 +37,20 @@ describe("Places Provider - TDD", () => {
         expect(place.location.lng).toBeLessThan(0);
       }
     });
+
+    it("should return verified places from specific AMBA and PBA zones with searchByZones", async () => {
+      const provider = new MockPlacesProvider();
+      const places = await provider.searchByZones([
+        "amba-vicente-lopez",
+        "amba-moron-castelar",
+        "pba-la-plata",
+      ]);
+      expect(places.length).toBeGreaterThan(0);
+      const zones = places.map((p) => p.zoneId);
+      expect(zones).toContain("amba-vicente-lopez");
+      expect(zones).toContain("amba-moron-castelar");
+      expect(zones).toContain("pba-la-plata");
+    });
   });
 
   describe("OpenStreetMapProvider (Overpass API)", () => {

@@ -1,49 +1,110 @@
-# Software Design Document (SDD) - Food Roulette (Fase 3: Rediseño Editorial, Modo Claro/Oscuro y Rango de Precios)
+# Software Design Document (SDD) - Food Roulette
+## Fase 4: Selección Múltiple de Comunas y Extensión a AMBA y Provincia de Buenos Aires
+
+---
 
 ## 1. Objetivo y Planteamiento del Problema
-- **Problema:**
-  1. **Estética genérica ("AI-generated vibe"):** La interfaz actual abusa de gradientes morados/oscuros, bordes brillantes y sombras de estilo dashboard genérico de IA, alejándose de la identidad visual de una app gastronómica de autor (estilo Beli, Michelin Guide o Eater).
-  2. **Falta de Modo Claro / Oscuro:** La app está forzada a modo oscuro sin opción de alternar según preferencia o luz ambiental.
-  3. **Ausencia de Rango de Precios:** Los usuarios no pueden filtrar por presupuesto (`$` Barato, `$$` Medio, `$$$` Caro) ni conocer el costo estimado de los lugares sugeridos antes de girar la ruleta.
-- **Objetivo:**
-  - Rediseñar por completo la experiencia visual hacia un estilo **Gourmet Editorial / Modern Bistro** con tipografía refinada, superficies limpias y paleta orgánica inspirada en el logo (terracota, ocre, lima fresca y carbón profundo).
-  - Implementar un sistema nativo de **Modo Claro y Oscuro** con persistencia en `localStorage` y detección de preferencia del sistema.
-  - Diseñar e implementar el módulo de **Rango de Precios (`$`, `$$`, `$$$`)** con rangos estimados en ARS, selector táctil en filtros y visualización clara en todas las tarjetas de restaurantes.
+
+### Problema:
+1. **Restricción de Comuna Única:** La selección actual de ubicación está limitada a elegir una única comuna de CABA a la vez. Los usuarios no pueden combinar varias comunas vecinas o de interés simultáneo (por ejemplo, Comuna 14 Palermo + Comuna 15 Villa Crespo/Chacarita + Comuna 13 Belgrano).
+2. **Límite Geográfico Estricto en Capital Federal:** La aplicación actualmente solo contempla las 15 comunas de CABA. Los usuarios que viven o desean salir a comer en el Gran Buenos Aires (AMBA Norte, Oeste, Sur) o polos gastronómicos de la Provincia de Buenos Aires (Gran La Plata, Pilar, etc.) no tienen cobertura ni opciones reales en la ruleta.
+
+### Objetivo:
+- Permitir la **selección múltiple y simultánea de comunas y partidos gastronómicos** (multi-select interactivo).
+- Extender la cobertura geográfica oficial incorporando **AMBA (Zona Norte, Zona Oeste, Zona Sur) y Provincia de Buenos Aires (Gran La Plata, Polos Gastronómicos)**, con zonas estructuradas por región.
+- Enriquecer el catálogo con **restaurantes 100% reales y verificados** de las nuevas áreas de AMBA y PBA, con coordenadas exactas, rango de precios y etiquetas gastronómicas.
+- Actualizar el motor de ruleta (`RouletteEngine`), el proveedor de lugares (`MockPlacesProvider`, `OpenStreetMapProvider`), los endpoints de API (`/api/places`) y la interfaz gráfica (`FilterBar`, `LeafletMap`, `page.tsx`) para soportar búsquedas y filtros multi-zona fluidos.
 
 ---
 
 ## 2. Propuesta de Arquitectura y Flujo de Datos
 
-### 1. Sistema de Temas (Claro / Oscuro)
-- Implementación de `ThemeProvider` / estado global reactivo:
-  - Clase `.dark` en el tag `<html>` controlada por estado y persistida en `localStorage('fr_theme')`.
-  - **Modo Claro (Gourmet Linen):** Fondo marfil/lino cálido (`#faf8f5`), tarjetas blancas puras (`#ffffff`), bordes sutiles en piedra cálida (`#e7e3dc`), texto en carbón tipográfico (`#1c1917`).
-  - **Modo Oscuro (Obsidian Bistro):** Fondo carbón profundo (`#121316`), tarjetas grafito suave (`#1a1c22`), bordes en pizarra (`#2a2d36`), texto en blanco suave (`#f4f4f6`).
-  - **Acentos Compartidos:** Naranja terracota del logo (`#ea580c` / `#f97316`), ocre tostado (`#d97706`), verde oliva/fresco (`#65a30d`), azul marino (`#0284c7`).
+```mermaid
+flowchart TD
+    UI[FilterBar Component] -->|selectedZoneIds: string[]| State[Page State / Store]
+    State -->|GET /api/places?zones=...| API[/api/places Route]
+    API --> Mock[MockPlacesProvider: CABA + AMBA + PBA]
+    API --> OSM[OpenStreetMapProvider: Multi-center query]
+    API --> Classifier[ClassifierService: Precios & Temas]
+    API -->|ClassifiedRestaurant[]| State
+    State --> Engine[RouletteEngine: Multi-zone & Radius filter]
+    State --> Map[LeafletMap: Multi-marker & Auto-fit bounds]
+    Engine --> Wheel[RouletteWheel: Spin with eligible pool]
+```
 
-### 2. Clasificación y Filtrado por Rango de Precios
-- **Modelo de Precios:**
-  - Nivel 1 (`$` - Barato / Económico): Estimado hasta $10.000 ARS por persona (pizzerías al paso, comida rápida, bodegones populares).
-  - Nivel 2 (`$$` - Medio / Estándar): Estimado $10.000 a $25.000 ARS por persona (trattorias, bares de autor, cocina regional).
-  - Nivel 3 (`$$$` - Caro / Premium): Estimado más de $25.000 ARS por persona (fine dining, parrillas premium, omakase).
-- **Inferencia en `ClassifierService`:**
-  - Tags de OSM: `fee`, `stars`, `cuisine` (`fine_dining`, `steak_house` -> 3; `fast_food`, `sandwich` -> 1).
-  - Palabras clave en nombre y temática.
-- **Filtrado en `RouletteEngine`:**
-  - `selectedPriceLevels?: (1 | 2 | 3)[]`. Si se selecciona uno o más niveles, se descartan candidatos que no coincidan.
+### 1. Modelo de Zonas Gastronómicas (`GastronomicZone`)
+Se formaliza el modelo de zonas geográficas manteniendo compatibilidad retroactiva con `CABA_COMUNAS`:
+
+```typescript
+export type ZoneRegion =
+  | "CABA"
+  | "AMBA_NORTE"
+  | "AMBA_OESTE"
+  | "AMBA_SUR"
+  | "PROVINCIA_BSAS";
+
+export interface GastronomicZone {
+  id: string; // ej: "caba-14", "amba-vicente-lopez", "amba-san-isidro", "amba-moron", "amba-lomas", "pba-la-plata"
+  region: ZoneRegion;
+  regionLabel: string;
+  name: string;
+  numberLabel?: string;
+  barrios: string[];
+  location: Coordinates;
+  radiusKm?: number;
+}
+```
+
+### 2. Estructura de Regiones y Partidos
+- **CABA (15 Comunas):** Comunas 1 a 15 con todos sus barrios (Palermo, Recoleta, San Telmo, Belgrano, Caballito, Devoto, etc.).
+- **AMBA Norte:**
+  - Vicente López (Olivos, Florida, Vicente López Centro, La Lucila)
+  - San Isidro (San Isidro Centro, Acassuso, Martínez, Boulogne)
+  - San Fernando (San Fernando, Victoria)
+  - Tigre (Tigre Centro, Delta, Rincón de Milberg, Nordelta)
+  - San Martín (San Martín, Villa Ballester)
+  - Pilar (Pilar Centro, Panamericana km 50)
+- **AMBA Oeste:**
+  - Morón / Castelar (Morón Centro, Castelar, Haedo)
+  - Ramos Mejía / La Matanza (Ramos Mejía, San Justo)
+  - Tres de Febrero (Caseros, Ciudad Jardín)
+  - Ituzaingó / Parque Leloir (Parque Leloir, Ituzaingó Centro)
+- **AMBA Sur:**
+  - Lomas de Zamora (Las Lomitas, Banfield, Temperley)
+  - Quilmes (Quilmes Centro, Bernal)
+  - Lanús (Lanucita polo gastronómico, Lanús Oeste)
+  - Avellaneda (Avellaneda Centro, Wilde)
+  - Almirante Brown (Adrogué, Burzaco)
+- **Gran La Plata & Provincia de Bs As:**
+  - La Plata Centro (Plaza Moreno, Eje Fundacional)
+  - City Bell & Gonnet (Polo gastronómico Cantilo)
+  - Campana / Zárate
+  - Polos de campo (Mercedes / Tomás Jofré, San Antonio de Areco)
+
+### 3. Enriquecimiento del Catálogo de Restaurantes Reales
+Se añaden locales 100% reales en AMBA y PBA:
+- **Vicente López & San Isidro:** Alo's Bistro (San Isidro/Boulogne), Cut Parrilla (Olivos), Asato Sushi (Olivos), La Rosa Negra (San Isidro), El Hornero (San Isidro).
+- **Tigre & Delta:** Il Novo María del Luján (Paseo Victorica, Tigre), Kanoo Cocina de Río.
+- **Morón, Castelar & Parque Leloir:** Bruce Grill Station (Parque Leloir), Kansas Grill Leloir, Don Battaglia (Castelar), The Galley Burgers (Morón).
+- **Ramos Mejía:** Cervecería Baum (Ramos Mejía), Lo de Carlitos (Av. de Mayo).
+- **Lomas de Zamora (Las Lomitas), Lanús & Quilmes:** Bodega Las Lomitas (Italia 450), Antares Las Lomitas, Taberna de Lanús (Lanucita), Parque Cervecero Quilmes.
+- **La Plata & City Bell:** Baxar Mercado Gastronómico (Calle 51), Paesano Ristorante (City Bell), Café Urquiza (La Plata).
 
 ---
 
 ## 3. Cambios en APIs e Interfaces
 
+### 1. `src/domain/types.ts`
 ```typescript
-export type PriceLevel = 1 | 2 | 3;
-
-export interface PriceTierInfo {
-  level: PriceLevel;
-  symbol: string;
-  label: string;
-  rangeDescription: string;
+export interface PlaceRaw {
+  externalId: string;
+  name: string;
+  location: Coordinates;
+  address?: string;
+  tags?: Record<string, string>;
+  rating?: number;
+  priceLevel?: PriceLevel;
+  zoneId?: string;
 }
 
 export interface ClassifiedRestaurant {
@@ -57,11 +118,13 @@ export interface ClassifiedRestaurant {
   dietarySuitability: DietaryRestriction[];
   priceLevel: PriceLevel;
   rating?: number;
+  zoneId?: string;
 }
 
 export interface RouletteFilterOptions {
   userLocation: Coordinates;
   radiusKm: number;
+  selectedZoneIds?: string[];
   selectedCuisines?: string[];
   selectedThemes?: string[];
   selectedPriceLevels?: PriceLevel[];
@@ -72,35 +135,68 @@ export interface RouletteFilterOptions {
 }
 ```
 
+### 2. `src/domain/roulette/roulette-engine.ts`
+- Se incorpora `selectedZoneIds?: string[]` a `SpinParams`.
+- Lógica de elegibilidad espacial:
+  - Si `selectedZoneIds` está activo ($\ge 1$), un restaurante es elegible si su `zoneId` coincide con alguno de los seleccionados, o si su proximidad a cualquiera de los centros de las zonas seleccionadas está dentro del radio.
+  - Si `selectedZoneIds` está vacío, se aplica el filtro estándar por `userLocation` y `radiusKm` (GPS / clic en mapa).
+
+### 3. `src/app/api/places/route.ts`
+- Acepta query param opcional `zones` (ej: `?zones=caba-14,amba-vicente-lopez,amba-lomas`).
+- Devuelve todos los restaurantes pertenecientes a las zonas seleccionadas o cercanos a las coordenadas proporcionadas.
+
+### 4. Componentes UI:
+- **`FilterBar.tsx`:**
+  - Selector multi-zona con pestañas/acordeón de regiones (`CABA`, `AMBA Norte`, `AMBA Oeste`, `AMBA Sur`, `Provincia / La Plata`).
+  - Chips interactivos con checkboxes, badge de conteo (`"3 zonas seleccionadas"`), botón "Seleccionar todas de CABA" y tags removibles con botón "X".
+  - Opción de conmutar a "Mi GPS" para búsqueda por radio geolocalizado.
+- **`LeafletMap.tsx`:**
+  - Auto-ajuste de vista (`fitBounds`) para encuadrar todos los pines de las múltiples zonas seleccionadas sin perder legibilidad.
+
 ---
 
 ## 4. Plan de Pruebas (TDD)
 
 ### A. Casos de Éxito (Happy Paths)
-1. **Clasificador de Precios:**
-   - Detecta nivel 1 (`$`) para lugares de comida rápida o bodegones tradicionales.
-   - Detecta nivel 3 (`$$$`) para fine dining, asadores premium y comida de autor.
-   - Asigna nivel 2 (`$$`) por defecto a restaurantes estándar.
-2. **Motor de Ruleta con Precios:**
-   - Si se selecciona solo nivel 1 (`$`), el pool resultante contiene exclusivamente restaurantes con `priceLevel === 1`.
-   - Si se seleccionan niveles 1 y 2 (`$`, `$$`), descarta los de nivel 3 (`$$$`).
-3. **Persistencia y Selector de Modo Claro/Oscuro:**
-   - Alternar el modo actualiza la clase del documento y persiste en almacenamiento.
+1. **Catálogo Unificado de Zonas (`zones.test.ts`):**
+   - Mantiene las 15 comunas de CABA con sus IDs y coordenadas válidas.
+   - Provee zonas de AMBA Norte, Oeste, Sur y PBA con coordenadas válidas dentro del conurbano y provincia.
+   - Permite filtrar zonas por región (`filterZonesByRegion("AMBA_NORTE")`).
+2. **Filtrado Multi-Zona en `RouletteEngine` (`roulette-engine.test.ts`):**
+   - Al seleccionar múltiples `selectedZoneIds` (ej: `["caba-14", "amba-vicente-lopez"]`), el motor incluye restaurantes de ambas zonas y descarta los de otras comunas (ej: `caba-1`).
+   - Respeta de forma conjunta los filtros de `selectedPriceLevels` y `requiredDietary` sobre las múltiples comunas.
+3. **Catálogo Real de AMBA / PBA en `MockPlacesProvider` (`places-provider.test.ts`):**
+   - Retorna restaurantes verificados en Vicente López, San Isidro, Morón, Lomas de Zamora y La Plata.
+   - `searchByZones(["amba-moron", "amba-lomas"])` retorna los locales de Zona Oeste y Sur solicitados.
+4. **Endpoint API `/api/places` (`api-endpoints.test.ts`):**
+   - La consulta `GET /api/places?zones=caba-14,amba-vicente-lopez` responde `200` con restaurantes de Palermo y Vicente López.
 
 ### B. Casos de Fallo y Errores (Edge Cases)
-1. **Filtro de precio sin coincidencias:** Lanza `NoEligibleRestaurantsError` sugiriendo ampliar el rango presupuestario.
-2. **Tags de precio inválidos o ausentes:** Fallback defensivo a nivel 2 sin fallar la consulta.
+1. **Zonas sin restaurantes que cumplan filtros estrictos:** `RouletteEngine` lanza `NoEligibleRestaurantsError` indicando ampliar los criterios o zonas.
+2. **IDs de zona inválidos o desconocidos:** Fallback defensivo que descarta IDs inexistentes sin romper la consulta ni retornar error 500.
 
 ---
 
 ## 5. Plan de Implementación (Paso a Paso)
 
-1. [ ] **TDD Fase 1:** Escribir pruebas unitarias para `PriceLevel` en `ClassifierService` y `RouletteEngine`.
-2. [ ] **TDD Fase 2:** Implementar lógica de inferencia y filtrado de precios.
-3. [ ] **Sistema de Tema (Claro / Oscuro):** Configurar soporte `darkMode: 'class'` en Tailwind, botón conmutador en `Navbar` y variables semánticas.
-4. [ ] **Rediseño Visual Completo (Anti-AI Aesthetic):**
-   - Tipografía editorial estilizada, tarjetas con acabado mate/papel texturado, controles segmentados limpios y ruleta artesanal con la paleta del logo.
-5. [ ] **Selector y Visualización de Precios:**
-   - Añadir control segmentado `$ / $$ / $$$` con rangos de costos en `FilterBar`.
-   - Mostrar insignias de costo en `WinnerCard` y `RecommendationsSection`.
-6. [ ] **Verificación con Vitest, Build de producción y Push a GitHub.**
+1. [ ] **Fase 1 (Zonas & Modelos):**
+   - Crear catálogo completo de zonas en `src/domain/zones/gastronomic-zones.ts` (15 comunas CABA + 15+ partidos AMBA/PBA).
+   - Mantener retrocompatibilidad en `src/domain/caba/comunas.ts`.
+   - Escribir tests unitarios en `src/domain/zones/__tests__/zones.test.ts`.
+2. [ ] **Fase 2 (Catálogo Real & Proveedor de Lugares):**
+   - Incorporar restaurantes 100% reales de AMBA y PBA con coordenadas verificadas en `MockPlacesProvider`.
+   - Implementar método `searchByZones` y actualizar `searchNearby`.
+   - Escribir tests unitarios en `places-provider.test.ts`.
+3. [ ] **Fase 3 (Motor de Ruleta Multi-Zona):**
+   - Actualizar `RouletteEngine` para soportar `selectedZoneIds`.
+   - Escribir tests en `roulette-engine.test.ts`.
+4. [ ] **Fase 4 (Endpoint API `/api/places`):**
+   - Soportar query param `zones` en `/api/places/route.ts`.
+   - Escribir tests de integración en `api-endpoints.test.ts`.
+5. [ ] **Fase 5 (Interfaz de Usuario):**
+   - Actualizar `FilterBar.tsx` con selector multi-zona agrupado por región (CABA, AMBA Norte/Oeste/Sur, La Plata/PBA) y chips interactivos.
+   - Actualizar `page.tsx` para sincronizar `selectedZoneIds` con el mapa, ruleta y API.
+   - Actualizar `LeafletMap.tsx` con ajuste dinámico de límites (`fitBounds`).
+6. [ ] **Fase 6 (Verificación & Calidad):**
+   - Ejecutar la suite completa de tests con Vitest (`npm test`).
+   - Validar build de producción (`npm run build`).

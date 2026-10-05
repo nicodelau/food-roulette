@@ -8,4 +8,5 @@ export interface SearchNearbyParams {
 
 export interface IPlacesProvider {
   searchNearby(params: SearchNearbyParams): Promise<PlaceRaw[]>;
+  searchByZones?(zoneIds: string[]): Promise<PlaceRaw[]>;
 }

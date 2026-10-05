@@ -41,6 +41,7 @@ export interface PlaceRaw {
   tags?: Record<string, string>;
   rating?: number;
   priceLevel?: PriceLevel;
+  zoneId?: string;
 }
 
 export type DietaryRestriction =
@@ -62,11 +63,13 @@ export interface ClassifiedRestaurant {
   dietarySuitability: DietaryRestriction[];
   priceLevel: PriceLevel;
   rating?: number;
+  zoneId?: string;
 }
 
 export interface RouletteFilterOptions {
   userLocation: Coordinates;
   radiusKm: number;
+  selectedZoneIds?: string[];
   selectedCuisines?: string[];
   selectedThemes?: string[];
   selectedPriceLevels?: PriceLevel[];

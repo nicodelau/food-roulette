@@ -120,6 +120,7 @@ export class ClassifierService {
       dietarySuitability,
       priceLevel,
       rating: place.rating,
+      zoneId: place.zoneId,
     };
   }
 

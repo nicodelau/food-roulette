@@ -21,6 +21,7 @@ import {
   UserLevel,
 } from "@/domain/gamification/gamification-service";
 import { RecommendationEngine } from "@/domain/recommendations/recommendation-engine";
+import { getZoneById, ALL_GASTRONOMIC_ZONES } from "@/domain/zones/gastronomic-zones";
 import { Sparkles, AlertCircle, RefreshCw } from "lucide-react";
 
 // Dynamic import for Leaflet map to prevent SSR issues
@@ -43,6 +44,7 @@ export default function HomePage() {
     PRESET_ZONES[0].coords
   );
   const [zoneName, setZoneName] = useState<string>(PRESET_ZONES[0].name);
+  const [selectedZoneIds, setSelectedZoneIds] = useState<string[]>(["caba-14"]);
 
   // 2. Filter States (Radio hasta 20km & Rango de Precios)
   const [radiusKm, setRadiusKm] = useState<number>(2.5);
@@ -167,14 +169,55 @@ export default function HomePage() {
     setSelectedWinner(null);
   };
 
-  // Fetch places from API when location or radius changes
+  const handleToggleZone = (zoneId: string) => {
+    setSelectedZoneIds((prev) => {
+      const isSelected = prev.includes(zoneId);
+      const updated = isSelected
+        ? prev.filter((id) => id !== zoneId)
+        : [...prev, zoneId];
+
+      if (!isSelected && updated.length === 1) {
+        const z = getZoneById(zoneId);
+        if (z) {
+          setCurrentLocation(z.location);
+          setZoneName(z.name);
+        }
+      } else if (updated.length > 1) {
+        setZoneName(`${updated.length} zonas seleccionadas`);
+      } else if (updated.length === 0) {
+        setZoneName("Ubicación libre (GPS)");
+      }
+      return updated;
+    });
+    setSelectedWinner(null);
+  };
+
+  const handleSelectAllCaba = () => {
+    const allCabaIds = ALL_GASTRONOMIC_ZONES.filter((z) => z.region === "CABA").map(
+      (z) => z.id
+    );
+    setSelectedZoneIds(allCabaIds);
+    setZoneName("Todas las Comunas de CABA");
+    setSelectedWinner(null);
+  };
+
+  const handleClearZones = () => {
+    setSelectedZoneIds([]);
+    setZoneName("Ubicación libre (GPS)");
+    setSelectedWinner(null);
+  };
+
+  // Fetch places from API when location, radius or selected zones change
   const fetchPlaces = useCallback(async () => {
     setIsLoadingPlaces(true);
     setPlacesError(null);
     try {
-      const res = await fetch(
-        `/api/places?lat=${currentLocation.lat}&lng=${currentLocation.lng}&radiusKm=${radiusKm}`
-      );
+      const url =
+        selectedZoneIds.length > 0
+          ? `/api/places?zones=${selectedZoneIds.join(",")}`
+          : `/api/places?lat=${currentLocation.lat}&lng=${currentLocation.lng}&radiusKm=${radiusKm}`;
+
+      const res = await fetch(url);
       const data = await res.json();
       if (data.success) {
         setAllPlaces(data.places);
@@ -187,7 +230,7 @@ export default function HomePage() {
     } finally {
       setIsLoadingPlaces(false);
     }
-  }, [currentLocation, radiusKm]);
+  }, [currentLocation, radiusKm, selectedZoneIds]);
 
   useEffect(() => {
     fetchPlaces();
@@ -196,6 +239,7 @@ export default function HomePage() {
   // Click on map to select search center
   const handleMapClick = (coords: Coordinates) => {
     setCurrentLocation(coords);
+    setSelectedZoneIds([]);
     setZoneName(`Punto en mapa (${coords.lat.toFixed(3)}, ${coords.lng.toFixed(3)})`);
     setSelectedWinner(null);
   };
@@ -217,6 +261,13 @@ export default function HomePage() {
         (visitedIds.has(place.id) || visitedIds.has(place.externalId))
       ) {
         return false;
+      }
+
+      // Zone filter (when zones are selected)
+      if (selectedZoneIds.length > 0 && place.zoneId) {
+        if (!selectedZoneIds.includes(place.zoneId)) {
+          return false;
+        }
       }
 
       // Price level filter
@@ -257,6 +308,7 @@ export default function HomePage() {
     visits,
     blacklist,
     excludeVisited,
+    selectedZoneIds,
     selectedPriceLevels,
     selectedDietaries,
     selectedCuisines,
@@ -299,6 +351,7 @@ export default function HomePage() {
           pool: allPlaces,
           userLocation: currentLocation,
           radiusKm,
+          selectedZoneIds: selectedZoneIds.length > 0 ? selectedZoneIds : undefined,
           selectedCuisines,
           selectedThemes,
           selectedPriceLevels,
@@ -440,6 +493,10 @@ export default function HomePage() {
                 setZoneName(name);
                 setSelectedWinner(null);
               }}
+              selectedZoneIds={selectedZoneIds}
+              onToggleZone={handleToggleZone}
+              onSelectAllCaba={handleSelectAllCaba}
+              onClearZones={handleClearZones}
               radiusKm={radiusKm}
               onRadiusChange={(r) => {
                 setRadiusKm(r);
@@ -475,6 +532,7 @@ export default function HomePage() {
                 setSelectedWinner(null);
               }}
               onResetFilters={() => {
+                setSelectedZoneIds([]);
                 setSelectedPriceLevels([]);
                 setSelectedCuisines([]);
                 setSelectedThemes([]);
